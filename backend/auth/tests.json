@@ -1,0 +1,19 @@
+{
+  "tests": [
+    {
+      "name": "Login with valid credentials",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "email": "mydavidmy@mail.ru",
+        "password": "131999davidmy"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "token": "string",
+        "admin": "object"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

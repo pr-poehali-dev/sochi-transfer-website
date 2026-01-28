@@ -1,70 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
+import BookingForm from '@/components/BookingForm';
+import { API_URLS } from '@/config/api';
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState('home');
 
-  const tariffs = [
-    {
-      city: 'Гагра',
-      price: '3500',
-      distance: '25 км',
-      time: '35 мин',
-      image: '🏖️'
-    },
-    {
-      city: 'Пицунда',
-      price: '4200',
-      distance: '35 км',
-      time: '50 мин',
-      image: '🌊'
-    },
-    {
-      city: 'Сухум',
-      price: '5500',
-      distance: '85 км',
-      time: '1 ч 30 мин',
-      image: '🏛️'
-    },
-    {
-      city: 'Новый Афон',
-      price: '4800',
-      distance: '60 км',
-      time: '1 ч 10 мин',
-      image: '⛪'
-    }
-  ];
+  const [tariffs, setTariffs] = useState<any[]>([]);
+  const [fleet, setFleet] = useState<any[]>([]);
 
-  const fleet = [
-    {
-      name: 'Mercedes-Benz E-Class',
-      type: 'Бизнес',
-      capacity: '3 пассажира',
-      luggage: '3 места',
-      features: ['Кондиционер', 'Wi-Fi', 'USB зарядка'],
-      image: '🚗'
-    },
-    {
-      name: 'Mercedes-Benz V-Class',
-      type: 'Минивэн',
-      capacity: '6 пассажиров',
-      luggage: '6 мест',
-      features: ['Панорамная крыша', 'Климат-контроль', 'Детские кресла'],
-      image: '🚙'
-    },
-    {
-      name: 'Toyota Camry',
-      type: 'Комфорт',
-      capacity: '3 пассажира',
-      luggage: '2 места',
-      features: ['Кондиционер', 'Аудиосистема', 'Подогрев сидений'],
-      image: '🚘'
+  useEffect(() => {
+    loadTariffs();
+    loadFleet();
+  }, []);
+
+  const loadTariffs = async () => {
+    try {
+      const response = await fetch(`${API_URLS.tariffs}?active=true`);
+      const data = await response.json();
+      setTariffs(data.tariffs || []);
+    } catch (error) {
+      console.error('Failed to load tariffs:', error);
     }
-  ];
+  };
+
+  const loadFleet = async () => {
+    try {
+      const response = await fetch(`${API_URLS.fleet}?active=true`);
+      const data = await response.json();
+      setFleet(data.fleet || []);
+    } catch (error) {
+      console.error('Failed to load fleet:', error);
+    }
+  };
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -128,38 +99,7 @@ const Index = () => {
               Комфортные поездки из аэропорта, вокзала и любой точки города. Встречаем с табличкой!
             </p>
 
-            <Card className="max-w-2xl mx-auto glass-effect border-white/40 shadow-2xl animate-scale-in">
-              <CardContent className="p-8">
-                <div className="grid gap-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Откуда</label>
-                      <Input placeholder="Аэропорт Сочи" className="bg-white/50" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Куда</label>
-                      <Input placeholder="Выберите город" className="bg-white/50" />
-                    </div>
-                  </div>
-                  
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Дата и время</label>
-                      <Input type="datetime-local" className="bg-white/50" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Номер рейса (опционально)</label>
-                      <Input placeholder="SU 1234" className="bg-white/50" />
-                    </div>
-                  </div>
-
-                  <Button size="lg" className="w-full gradient-primary text-white font-semibold text-lg h-14 hover:scale-105 transition-transform">
-                    <Icon name="Search" className="mr-2 h-5 w-5" />
-                    Рассчитать стоимость
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <BookingForm />
 
             <div className="grid md:grid-cols-3 gap-6 mt-16 max-w-3xl mx-auto">
               {[
@@ -192,9 +132,9 @@ const Index = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {tariffs.map((tariff, idx) => (
-              <Card key={idx} className="hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border-2 hover:border-primary/50 animate-fade-in" style={{ animationDelay: `${idx * 0.1}s` }}>
+              <Card key={tariff.id} className="hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border-2 hover:border-primary/50 animate-fade-in" style={{ animationDelay: `${idx * 0.1}s` }}>
                 <CardHeader className="text-center pb-4">
-                  <div className="text-6xl mb-4">{tariff.image}</div>
+                  <div className="text-6xl mb-4">{tariff.image_emoji}</div>
                   <CardTitle className="text-2xl">{tariff.city}</CardTitle>
                   <CardDescription className="text-sm">из Аэропорта Сочи</CardDescription>
                 </CardHeader>
@@ -211,11 +151,11 @@ const Index = () => {
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Icon name="Clock" className="h-4 w-4 text-primary" />
-                      <span>~{tariff.time}</span>
+                      <span>~{tariff.duration}</span>
                     </div>
                   </div>
 
-                  <Button className="w-full gradient-primary text-white hover:scale-105 transition-transform">
+                  <Button className="w-full gradient-primary text-white hover:scale-105 transition-transform" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
                     Заказать
                   </Button>
                 </CardContent>
@@ -237,9 +177,9 @@ const Index = () => {
 
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {fleet.map((car, idx) => (
-              <Card key={idx} className="hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 animate-fade-in" style={{ animationDelay: `${idx * 0.1}s` }}>
+              <Card key={car.id} className="hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 animate-fade-in" style={{ animationDelay: `${idx * 0.1}s` }}>
                 <CardHeader className="text-center">
-                  <div className="text-7xl mb-4">{car.image}</div>
+                  <div className="text-7xl mb-4">{car.image_emoji}</div>
                   <CardTitle className="text-xl mb-2">{car.name}</CardTitle>
                   <Badge className="gradient-secondary text-white border-0">{car.type}</Badge>
                 </CardHeader>
@@ -247,16 +187,16 @@ const Index = () => {
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="flex items-center gap-2">
                       <Icon name="Users" className="h-4 w-4 text-primary" />
-                      <span>{car.capacity}</span>
+                      <span>{car.capacity} пасс.</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Icon name="Luggage" className="h-4 w-4 text-primary" />
-                      <span>{car.luggage}</span>
+                      <span>{car.luggage_capacity} мест</span>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t space-y-2">
-                    {car.features.map((feature, fIdx) => (
+                    {car.features.slice(0, 3).map((feature: string, fIdx: number) => (
                       <div key={fIdx} className="flex items-center gap-2 text-sm">
                         <Icon name="CheckCircle2" className="h-4 w-4 text-green-500" />
                         <span>{feature}</span>
@@ -264,7 +204,7 @@ const Index = () => {
                     ))}
                   </div>
 
-                  <Button variant="outline" className="w-full hover:gradient-primary hover:text-white hover:border-0 transition-all">
+                  <Button variant="outline" className="w-full hover:gradient-primary hover:text-white hover:border-0 transition-all" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
                     Выбрать авто
                   </Button>
                 </CardContent>
