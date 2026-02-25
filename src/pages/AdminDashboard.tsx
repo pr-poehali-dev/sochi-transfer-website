@@ -10,6 +10,7 @@ import TariffsManager from '@/components/admin/TariffsManager';
 import FleetManager from '@/components/admin/FleetManager';
 import OrdersManager from '@/components/admin/OrdersManager';
 import StatusesManager from '@/components/admin/StatusesManager';
+import PaymentSettingsManager from '@/components/admin/PaymentSettingsManager';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ const AdminDashboard = () => {
 
       setStats({
         totalOrders: ordersData.orders?.length || 0,
-        newOrders: ordersData.orders?.filter((o: any) => o.status_id === 1).length || 0,
+        newOrders: ordersData.orders?.filter((o: {status_id: number}) => o.status_id === 1).length || 0,
         activeTariffs: tariffsData.tariffs?.length || 0,
         activeFleet: fleetData.fleet?.length || 0
       });
@@ -144,6 +145,10 @@ const AdminDashboard = () => {
               <Icon name="Tag" className="mr-2 h-4 w-4" />
               Статусы
             </TabsTrigger>
+            <TabsTrigger value="payment" className="data-[state=active]:gradient-primary data-[state=active]:text-white">
+              <Icon name="CreditCard" className="mr-2 h-4 w-4" />
+              Оплата
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders">
@@ -160,6 +165,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="statuses">
             <StatusesManager />
+          </TabsContent>
+
+          <TabsContent value="payment">
+            <PaymentSettingsManager />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,10 +8,11 @@ import BookingForm from '@/components/BookingForm';
 import { API_URLS } from '@/config/api';
 
 const Index = () => {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('home');
 
-  const [tariffs, setTariffs] = useState<any[]>([]);
-  const [fleet, setFleet] = useState<any[]>([]);
+  const [tariffs, setTariffs] = useState<Record<string, unknown>[]>([]);
+  const [fleet, setFleet] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
     loadTariffs();
@@ -48,8 +50,13 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center gap-2">
-              <div className="text-3xl">🚗</div>
-              <span className="text-2xl font-bold text-gradient">Sochi Transfer</span>
+              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                <Icon name="Car" className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex flex-col leading-tight">
+                <span className="text-xl font-bold text-gradient">ПоехалиПро</span>
+                <span className="text-xs text-muted-foreground font-medium">Трансфер Абхазия-Россия</span>
+              </div>
             </div>
             
             <div className="hidden md:flex items-center gap-8">
@@ -64,6 +71,13 @@ const Index = () => {
                   {item}
                 </button>
               ))}
+              <button
+                onClick={() => navigate('/rideshares')}
+                className="text-sm font-medium transition-all hover:text-primary text-foreground/70 flex items-center gap-1"
+              >
+                <Icon name="Users" className="h-3.5 w-3.5" />
+                Попутчики
+              </button>
             </div>
 
             <div className="flex items-center gap-3">
@@ -210,6 +224,38 @@ const Index = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Секция Попутчики */}
+      <section id="попутчики" className="py-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <Card className="bg-gradient-to-br from-primary/10 via-background to-accent/10 border-2 border-primary/20 overflow-hidden">
+              <CardContent className="p-8 md:p-12">
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div className="flex-1">
+                    <Badge className="mb-4 gradient-primary text-white border-0">Новинка</Badge>
+                    <h2 className="text-3xl md:text-4xl font-bold mb-4">Едем вместе — дешевле!</h2>
+                    <p className="text-muted-foreground mb-6 text-lg">
+                      Раздели стоимость трансфера с другими пассажирами. Находи попутчиков из аэропорта Сочи в Абхазию или предлагай свободные места.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <Button className="gradient-primary text-white" onClick={() => navigate('/rideshares')}>
+                        <Icon name="Users" className="mr-2 h-4 w-4" />
+                        Найти попутчиков
+                      </Button>
+                      <Button variant="outline" onClick={() => navigate('/rideshares')}>
+                        <Icon name="Plus" className="mr-2 h-4 w-4" />
+                        Предложить поездку
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-8xl">🚕</div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>

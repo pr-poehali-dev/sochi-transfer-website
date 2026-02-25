@@ -1,5 +1,7 @@
 import json
 import os
+import base64
+import boto3
 import psycopg2
 
 def handler(event: dict, context) -> dict:
@@ -53,6 +55,36 @@ def handler(event: dict, context) -> dict:
         
         elif method == 'POST':
             data = json.loads(event.get('body', '{}'))
+            
+            # Загрузка фото в S3
+            if data.get('action') == 'upload_photo':
+                cur.close(); conn.close()
+                try:
+                    s3 = boto3.client('s3',
+                        endpoint_url='https://bucket.poehali.dev',
+                        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+                        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY']
+                    )
+                    import uuid
+                    ext = data.get('filename', 'photo.jpg').rsplit('.', 1)[-1].lower()
+                    key = f'fleet/{uuid.uuid4()}.{ext}'
+                    img_data = base64.b64decode(data.get('data', ''))
+                    s3.put_object(Bucket='files', Key=key, Body=img_data, ContentType=data.get('content_type', 'image/jpeg'))
+                    access_key = os.environ['AWS_ACCESS_KEY_ID']
+                    cdn_url = f"https://cdn.poehali.dev/projects/{access_key}/bucket/{key}"
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'url': cdn_url}),
+                        'isBase64Encoded': False
+                    }
+                except Exception as e:
+                    return {
+                        'statusCode': 500,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': str(e)}),
+                        'isBase64Encoded': False
+                    }
             
             cur.execute('''
                 INSERT INTO fleet (name, type, capacity, luggage_capacity, features, 

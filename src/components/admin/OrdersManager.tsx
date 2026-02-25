@@ -19,9 +19,16 @@ interface Order {
   passenger_email: string;
   flight_number?: string;
   price: number;
+  prepay_amount?: number;
+  payment_type?: string;
+  transfer_type?: string;
+  car_class?: string;
+  passengers_count?: number;
+  status_id?: number;
   status_name: string;
   status_color: string;
   tariff_city?: string;
+  notes?: string;
   created_at: string;
 }
 
@@ -34,6 +41,10 @@ interface Status {
 interface OrdersManagerProps {
   onUpdate: () => void;
 }
+
+const TRANSFER_LABELS: Record<string, string> = { individual: 'Индивидуальный', group: 'Групповой' };
+const CAR_LABELS: Record<string, string> = { economy: 'Эконом', comfort: 'Комфорт', business: 'Бизнес', minivan: 'Минивэн' };
+const PAYMENT_LABELS: Record<string, string> = { full: 'Полная', prepay: 'Предоплата' };
 
 const OrdersManager = ({ onUpdate }: OrdersManagerProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -108,20 +119,39 @@ const OrdersManager = ({ onUpdate }: OrdersManagerProps) => {
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString('ru-RU', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const exportToCSV = () => {
+    const headers = ['ID', 'Пассажир', 'Телефон', 'Email', 'Откуда', 'Куда', 'Дата подачи', 'Кол-во пасс.', 'Тип трансфера', 'Класс авто', 'Оплата', 'Цена', 'Статус', 'Создана'];
+    const rows = orders.map(o => [
+      o.id, o.passenger_name, o.passenger_phone, o.passenger_email,
+      o.from_location, o.to_location,
+      o.pickup_datetime ? formatDateTime(o.pickup_datetime) : '',
+      o.passengers_count || 1,
+      TRANSFER_LABELS[o.transfer_type || 'individual'] || '',
+      CAR_LABELS[o.car_class || 'comfort'] || '',
+      PAYMENT_LABELS[o.payment_type || 'full'] || '',
+      o.price, o.status_name,
+      o.created_at ? formatDateTime(o.created_at) : ''
+    ]);
+    const csvContent = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `orders_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
   };
 
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Заявки на трансфер</CardTitle>
+          <Button variant="outline" size="sm" onClick={exportToCSV}>
+            <Icon name="Download" className="mr-2 h-4 w-4" />
+            Экспорт CSV
+          </Button>
         </CardHeader>
         <CardContent>
           <Table>
@@ -238,6 +268,24 @@ const OrdersManager = ({ onUpdate }: OrdersManagerProps) => {
                     <p className="text-sm font-medium text-muted-foreground">Стоимость</p>
                     <p className="text-lg font-bold text-gradient">{selectedOrder.price} ₽</p>
                   </div>
+                </div>
+              </div>
+              <div className="border-t pt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Тип трансфера</p>
+                  <p>{TRANSFER_LABELS[selectedOrder.transfer_type || 'individual']}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Класс авто</p>
+                  <p>{CAR_LABELS[selectedOrder.car_class || 'comfort']}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Пассажиров</p>
+                  <p>{selectedOrder.passengers_count || 1}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Тип оплаты</p>
+                  <p>{PAYMENT_LABELS[selectedOrder.payment_type || 'full']}{selectedOrder.prepay_amount ? ` (предоплата ${selectedOrder.prepay_amount} ₽)` : ''}</p>
                 </div>
               </div>
               <div className="border-t pt-4">

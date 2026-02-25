@@ -32,6 +32,7 @@ const FleetManager = ({ onUpdate }: FleetManagerProps) => {
   const [fleet, setFleet] = useState<Fleet[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCar, setEditingCar] = useState<Fleet | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     type: '',
@@ -124,6 +125,36 @@ const FleetManager = ({ onUpdate }: FleetManagerProps) => {
     setIsDialogOpen(true);
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast({ variant: 'destructive', title: 'Ошибка', description: 'Выберите изображение' }); return; }
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const res = await fetch(API_URLS.fleet, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'upload_photo', filename: file.name, content_type: file.type, data: base64 }),
+        });
+        const data = await res.json();
+        if (data.url) {
+          setFormData(prev => ({ ...prev, image_url: data.url }));
+          toast({ title: 'Фото загружено!' });
+        } else {
+          toast({ variant: 'destructive', title: 'Ошибка', description: data.error || 'Не удалось загрузить фото' });
+        }
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast({ variant: 'destructive', title: 'Ошибка', description: 'Не удалось загрузить фото' });
+      setIsUploading(false);
+    }
+  };
+
   const resetForm = () => {
     setEditingCar(null);
     setFormData({ name: '', type: '', capacity: '', luggage_capacity: '', features: '', image_url: '', image_emoji: '🚗', is_active: true });
@@ -170,8 +201,23 @@ const FleetManager = ({ onUpdate }: FleetManagerProps) => {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>URL изображения (опционально)</Label>
-                <Input placeholder="https://..." value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} />
+                <Label>Фото автомобиля</Label>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input placeholder="https://..." value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} className="flex-1" />
+                    <label className="cursor-pointer">
+                      <Button type="button" variant="outline" size="icon" disabled={isUploading} asChild>
+                        <span>
+                          {isUploading ? <Icon name="Loader2" className="h-4 w-4 animate-spin" /> : <Icon name="Upload" className="h-4 w-4" />}
+                        </span>
+                      </Button>
+                      <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                    </label>
+                  </div>
+                  {formData.image_url && (
+                    <img src={formData.image_url} alt="preview" className="w-full h-32 object-cover rounded-lg" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Особенности (каждая с новой строки)</Label>
