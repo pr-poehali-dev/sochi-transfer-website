@@ -85,16 +85,38 @@ def handle_orders(method, event):
 
     elif method == 'POST':
         data = json.loads(event.get('body', '{}'))
-        prepay_amount = round((data.get('price', 0) or 0) * 0.3) if data.get('payment_type') == 'prepay' else 0
         headers = event.get('headers', {}) or {}
         user_id = headers.get('X-User-Id') or data.get('user_id')
+
+        # Проверяем авторизацию — заказ только для зарегистрированных
+        if not user_id:
+            cur.close(); conn.close()
+            return resp(401, {'error': 'Для оформления заказа необходимо войти в аккаунт'})
+
+        prepay_amount = round((data.get('price', 0) or 0) * 0.3) if data.get('payment_type') == 'prepay' else 0
+        payment_from_balance = data.get('payment_from_balance', False)
+
+        # Оплата с баланса
+        if payment_from_balance:
+            price = float(data.get('price', 0))
+            if price <= 0:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'Некорректная сумма'})
+            cur.execute(f"SELECT balance FROM {SCHEMA}.users WHERE id=%s", (int(user_id),))
+            bal_row = cur.fetchone()
+            if not bal_row or float(bal_row[0]) < price:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'Недостаточно средств на балансе'})
+            # Списываем сразу
+            cur.execute(f"UPDATE {SCHEMA}.users SET balance=balance-%s WHERE id=%s", (price, int(user_id)))
+
         cur.execute(f'''
             INSERT INTO {SCHEMA}.orders (
                 from_location, to_location, pickup_datetime, flight_number,
                 passenger_name, passenger_phone, passenger_email,
                 passengers_count, luggage_count, tariff_id, fleet_id,
-                status_id, price, notes, transfer_type, car_class, payment_type, prepay_amount, user_id
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                status_id, price, notes, transfer_type, car_class, payment_type, prepay_amount, user_id, payment_from_balance
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
         ''', (
             data.get('from_location'), data.get('to_location'), data.get('pickup_datetime'),
             data.get('flight_number'), data.get('passenger_name'), data.get('passenger_phone'),
@@ -103,13 +125,18 @@ def handle_orders(method, event):
             data.get('price'), data.get('notes'),
             data.get('transfer_type', 'individual'), data.get('car_class', 'comfort'),
             data.get('payment_type', 'full'), prepay_amount,
-            int(user_id) if user_id else None
+            int(user_id), payment_from_balance
         ))
         oid = cur.fetchone()[0]
+
+        if payment_from_balance:
+            cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (user_id,amount,type,description,status) VALUES (%s,%s,'payment','Оплата заказа #%s','completed')",
+                        (int(user_id), -float(data.get('price',0)), oid))
+
         conn.commit(); cur.close(); conn.close()
-        
+
         send_telegram_notification(data, oid)
-        
+
         return resp(201, {'id': oid, 'message': 'Заявка создана'})
 
     elif method == 'PUT':

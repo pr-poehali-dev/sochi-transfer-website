@@ -166,8 +166,10 @@ def handle_news(method, event, params):
     elif method == 'POST':
         data = json.loads(event.get('body', '{}'))
         image_url = None
-        if data.get('image_base64'):
-            image_url = upload_s3(data['image_base64'], f"news_{os.urandom(6).hex()}.jpg", 'news')
+        # Поддержка обоих вариантов: image_base64 и image_b64
+        img_b64 = data.get('image_base64') or data.get('image_b64')
+        if img_b64:
+            image_url = upload_s3(img_b64, f"news_{os.urandom(6).hex()}.jpg", 'news')
         cur.execute(f'''
             INSERT INTO {SCHEMA}.news (title,content,image_url,is_published,published_at)
             VALUES (%s,%s,%s,%s,CASE WHEN %s THEN NOW() ELSE NULL END) RETURNING id
@@ -178,8 +180,9 @@ def handle_news(method, event, params):
     elif method == 'PUT':
         data = json.loads(event.get('body', '{}'))
         image_url = data.get('image_url')
-        if data.get('image_base64'):
-            image_url = upload_s3(data['image_base64'], f"news_{os.urandom(6).hex()}.jpg", 'news')
+        img_b64 = data.get('image_base64') or data.get('image_b64')
+        if img_b64:
+            image_url = upload_s3(img_b64, f"news_{os.urandom(6).hex()}.jpg", 'news')
         cur.execute(f'''
             UPDATE {SCHEMA}.news SET title=%s,content=%s,is_published=%s,
             published_at=CASE WHEN %s AND published_at IS NULL THEN NOW() ELSE published_at END,
@@ -247,8 +250,78 @@ def handle_reviews(method, event, params):
     return resp(405, {'error': 'Method not allowed'})
 
 
+# ===== TRANSFER TYPES =====
+def handle_transfer_types(method, event, params):
+    conn = get_conn(); cur = conn.cursor()
+    if method == 'GET':
+        active_only = params.get('active', 'false') == 'true'
+        q = f"SELECT id,value,label,description,icon,is_active,sort_order FROM {SCHEMA}.transfer_types" + (" WHERE is_active=true" if active_only else "") + " ORDER BY sort_order,id"
+        cur.execute(q)
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return resp(200, {'transfer_types': rows})
+    elif method == 'POST':
+        data = json.loads(event.get('body', '{}'))
+        cur.execute(f'''
+            INSERT INTO {SCHEMA}.transfer_types (value,label,description,icon,is_active,sort_order)
+            VALUES (%s,%s,%s,%s,%s,%s) RETURNING id
+        ''', (data.get('value'), data.get('label'), data.get('description',''), data.get('icon','User'), data.get('is_active',True), data.get('sort_order',0)))
+        tid = cur.fetchone()[0]
+        conn.commit(); cur.close(); conn.close()
+        return resp(201, {'id': tid, 'message': 'Тип создан'})
+    elif method == 'PUT':
+        data = json.loads(event.get('body', '{}'))
+        cur.execute(f'''
+            UPDATE {SCHEMA}.transfer_types SET label=%s,description=%s,icon=%s,is_active=%s,sort_order=%s WHERE id=%s
+        ''', (data.get('label'), data.get('description',''), data.get('icon','User'), data.get('is_active',True), data.get('sort_order',0), data.get('id')))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Тип обновлён'})
+    elif method == 'DELETE':
+        tid = params.get('id','0')
+        cur.execute(f"DELETE FROM {SCHEMA}.transfer_types WHERE id=%s", (int(tid),))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Тип удалён'})
+    return resp(405, {'error': 'Method not allowed'})
+
+
+# ===== CAR CLASSES =====
+def handle_car_classes(method, event, params):
+    conn = get_conn(); cur = conn.cursor()
+    if method == 'GET':
+        active_only = params.get('active', 'false') == 'true'
+        q = f"SELECT id,value,label,description,icon,price_multiplier,is_active,sort_order FROM {SCHEMA}.car_classes" + (" WHERE is_active=true" if active_only else "") + " ORDER BY sort_order,id"
+        cur.execute(q)
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return resp(200, {'car_classes': rows})
+    elif method == 'POST':
+        data = json.loads(event.get('body', '{}'))
+        cur.execute(f'''
+            INSERT INTO {SCHEMA}.car_classes (value,label,description,icon,price_multiplier,is_active,sort_order)
+            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+        ''', (data.get('value'), data.get('label'), data.get('description',''), data.get('icon','Car'), float(data.get('price_multiplier',1.0)), data.get('is_active',True), data.get('sort_order',0)))
+        cid = cur.fetchone()[0]
+        conn.commit(); cur.close(); conn.close()
+        return resp(201, {'id': cid, 'message': 'Класс создан'})
+    elif method == 'PUT':
+        data = json.loads(event.get('body', '{}'))
+        cur.execute(f'''
+            UPDATE {SCHEMA}.car_classes SET label=%s,description=%s,icon=%s,price_multiplier=%s,is_active=%s,sort_order=%s WHERE id=%s
+        ''', (data.get('label'), data.get('description',''), data.get('icon','Car'), float(data.get('price_multiplier',1.0)), data.get('is_active',True), data.get('sort_order',0), data.get('id')))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Класс обновлён'})
+    elif method == 'DELETE':
+        cid = params.get('id','0')
+        cur.execute(f"DELETE FROM {SCHEMA}.car_classes WHERE id=%s", (int(cid),))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Класс удалён'})
+    return resp(405, {'error': 'Method not allowed'})
+
+
 def handler(event: dict, context) -> dict:
-    '''Мультироутер: tariffs, settings, services, news, reviews — по параметру ?resource='''
+    '''Мультироутер: tariffs, settings, services, news, reviews, transfer_types, car_classes'''
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': {**CORS, 'Access-Control-Max-Age': '86400'}, 'body': ''}
 
@@ -265,6 +338,10 @@ def handler(event: dict, context) -> dict:
             return handle_news(method, event, params)
         elif resource == 'reviews':
             return handle_reviews(method, event, params)
+        elif resource == 'transfer_types':
+            return handle_transfer_types(method, event, params)
+        elif resource == 'car_classes':
+            return handle_car_classes(method, event, params)
         else:
             return handle_tariffs(method, event, params)
     except Exception as e:

@@ -143,6 +143,10 @@ const SiteSettingsManager = () => {
                 <Input value={settings['viber_number'] || ''} onChange={e => set('viber_number', e.target.value)} placeholder="79001234567" />
               </div>
               <div>
+                <Label>MAX (VK Мессенджер) — username или ссылка</Label>
+                <Input value={settings['max_username'] || ''} onChange={e => set('max_username', e.target.value)} placeholder="poehaliplus" />
+              </div>
+              <div>
                 <Label>Телефон компании</Label>
                 <Input value={settings['company_phone'] || ''} onChange={e => set('company_phone', e.target.value)} placeholder="+7 (912) 345-67-89" />
               </div>
@@ -154,7 +158,7 @@ const SiteSettingsManager = () => {
                 <Label>Адрес</Label>
                 <Input value={settings['company_address'] || ''} onChange={e => set('company_address', e.target.value)} />
               </div>
-              <SaveButton keys={['whatsapp_number', 'telegram_username', 'viber_number', 'company_phone', 'company_email', 'company_address']} />
+              <SaveButton keys={['whatsapp_number', 'telegram_username', 'viber_number', 'max_username', 'company_phone', 'company_email', 'company_address']} />
             </CardContent>
           </Card>
 

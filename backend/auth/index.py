@@ -122,6 +122,40 @@ def handle_users(method, event, params, data, headers):
             cur.execute(f"UPDATE {SCHEMA}.users SET name=%s,email=%s,updated_at=NOW() WHERE id=%s", (data.get('name'), data.get('email'), int(user_id)))
             conn.commit(); cur.close(); conn.close()
             return resp(200, {'message': 'Профиль обновлён'})
+        elif action == 'admin_update':
+            uid_upd = data.get('id')
+            if not uid_upd:
+                return resp(400, {'error': 'id обязателен'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"UPDATE {SCHEMA}.users SET name=%s,email=%s,phone=%s,is_active=%s,updated_at=NOW() WHERE id=%s",
+                        (data.get('name'), data.get('email'), data.get('phone'), data.get('is_active', True), int(uid_upd)))
+            if data.get('new_password'):
+                cur.execute(f"UPDATE {SCHEMA}.users SET password_hash=%s WHERE id=%s", (hash_password(data['new_password']), int(uid_upd)))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Пользователь обновлён'})
+        elif action == 'admin_delete':
+            uid_del = data.get('id')
+            if not uid_del:
+                return resp(400, {'error': 'id обязателен'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"UPDATE {SCHEMA}.users SET is_active=false,updated_at=NOW() WHERE id=%s", (int(uid_del),))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Пользователь заблокирован'})
+        elif action == 'admin_create':
+            phone = data.get('phone', '').strip()
+            name = data.get('name', '').strip()
+            password = data.get('password', '')
+            if not phone or not name or not password:
+                return resp(400, {'error': 'Телефон, имя и пароль обязательны'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id FROM {SCHEMA}.users WHERE phone=%s", (phone,))
+            if cur.fetchone():
+                cur.close(); conn.close(); return resp(400, {'error': 'Пользователь с таким телефоном уже существует'})
+            cur.execute(f"INSERT INTO {SCHEMA}.users (phone,name,email,password_hash) VALUES (%s,%s,%s,%s) RETURNING id",
+                        (phone, name, data.get('email',''), hash_password(password)))
+            uid = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            return resp(201, {'id': uid, 'message': 'Пользователь создан'})
     elif method == 'GET':
         action = params.get('action', 'profile')
         if action == 'profile' and user_id:
@@ -183,27 +217,34 @@ def handle_drivers(method, event, params, data, headers):
                   data.get('car_number',''), data.get('car_number_country','RUS')))
             did = cur.fetchone()[0]
             conn.commit()
-            files = data.get('files', {})
-            updates = []; vals = []
-            for field, b64 in files.items():
-                if b64 and field in ['passport_photo','license_front','license_back','car_tech_passport_front','car_tech_passport_back']:
-                    url = upload_s3(b64, f"{did}_{field}.jpg", 'drivers')
-                    updates.append(f"{field}_url=%s"); vals.append(url)
-            if updates:
-                vals.append(did)
-                cur.execute(f"UPDATE {SCHEMA}.drivers SET {','.join(updates)} WHERE id=%s", vals)
-                conn.commit()
-            car_photos = data.get('car_photos', [])
-            if car_photos:
-                urls = []
-                for i, b64 in enumerate(car_photos[:5]):
-                    if b64:
-                        urls.append(upload_s3(b64, f"{did}_car_{i}.jpg", 'drivers'))
-                if urls:
-                    cur.execute(f"UPDATE {SCHEMA}.drivers SET car_photos_urls=%s WHERE id=%s", (json.dumps(urls), did))
+            # Загрузка документов (опционально, не блокирует регистрацию)
+            try:
+                files = data.get('files', {})
+                updates = []; vals = []
+                for field, b64 in files.items():
+                    if b64 and field in ['passport_photo','license_front','license_back','car_tech_passport_front','car_tech_passport_back']:
+                        url = upload_s3(b64, f"{did}_{field}.jpg", 'drivers')
+                        updates.append(f"{field}_url=%s"); vals.append(url)
+                if updates:
+                    vals.append(did)
+                    cur.execute(f"UPDATE {SCHEMA}.drivers SET {','.join(updates)} WHERE id=%s", vals)
                     conn.commit()
+                car_photos = data.get('car_photos', [])
+                if car_photos:
+                    urls = []
+                    for i, b64 in enumerate(car_photos[:5]):
+                        if b64:
+                            urls.append(upload_s3(b64, f"{did}_car_{i}.jpg", 'drivers'))
+                    if urls:
+                        cur.execute(f"UPDATE {SCHEMA}.drivers SET car_photos_urls=%s WHERE id=%s", (json.dumps(urls), did))
+                        conn.commit()
+            except Exception:
+                pass  # Документы можно загрузить позже
             cur.close(); conn.close()
-            send_notification(f"🚗 *Новый водитель #{did}*\n{name} · {phone}\n{data.get('car_brand','')} {data.get('car_model','')}")
+            try:
+                send_notification(f"🚗 *Новый водитель #{did}*\n{name} · {phone}\n{data.get('car_brand','')} {data.get('car_model','')}")
+            except Exception:
+                pass
             token = secrets.token_urlsafe(32)
             return resp(201, {'token': token, 'driver': {'id': did, 'name': name, 'phone': phone, 'status': 'pending'}})
         elif action == 'login':

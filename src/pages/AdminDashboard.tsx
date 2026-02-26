@@ -16,6 +16,8 @@ import NewsManager from '@/components/admin/NewsManager';
 import ReviewsManager from '@/components/admin/ReviewsManager';
 import DriversManager from '@/components/admin/DriversManager';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
+import TransferClassesManager from '@/components/admin/TransferClassesManager';
+import UsersManager from '@/components/admin/UsersManager';
 
 interface Withdrawal {
   id: number;
@@ -235,6 +237,14 @@ const AdminDashboard = () => {
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="users">
+                <Icon name="UserCheck" className="mr-1.5 h-4 w-4" />
+                Пользователи
+              </TabsTrigger>
+              <TabsTrigger value="transfer_classes">
+                <Icon name="Sliders" className="mr-1.5 h-4 w-4" />
+                Типы/Классы
+              </TabsTrigger>
               <TabsTrigger value="settings">
                 <Icon name="Settings" className="mr-1.5 h-4 w-4" />
                 Настройки
@@ -272,6 +282,14 @@ const AdminDashboard = () => {
 
           <TabsContent value="payment">
             <PaymentSettingsManager />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UsersManager />
+          </TabsContent>
+
+          <TabsContent value="transfer_classes">
+            <TransferClassesManager />
           </TabsContent>
 
           <TabsContent value="finance">

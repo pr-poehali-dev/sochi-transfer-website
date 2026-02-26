@@ -5,9 +5,31 @@
       "method": "GET",
       "path": "/?active=true",
       "expectedStatus": 200,
-      "expectedBody": {
-        "tariffs": "array"
-      },
+      "expectedBody": { "tariffs": "array" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get transfer types",
+      "method": "GET",
+      "path": "/?resource=transfer_types",
+      "expectedStatus": 200,
+      "expectedBody": { "transfer_types": "array" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get car classes",
+      "method": "GET",
+      "path": "/?resource=car_classes",
+      "expectedStatus": 200,
+      "expectedBody": { "car_classes": "array" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get news",
+      "method": "GET",
+      "path": "/?resource=news&admin=true",
+      "expectedStatus": 200,
+      "expectedBody": { "news": "array" },
       "bodyMatcher": "partial"
     }
   ]

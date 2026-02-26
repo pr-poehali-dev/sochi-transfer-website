@@ -6,11 +6,13 @@ export const API_URLS = {
   orders: ORDERS_BASE,
   rideshares: `${ORDERS_BASE}?resource=rideshares`,
   paymentSettings: `${ORDERS_BASE}?resource=payment_settings`,
-  news: `${ORDERS_BASE}?resource=news`,
   tariffs: TARIFFS_BASE,
   fleet: 'https://functions.poehali.dev/cbf23917-dd96-4252-96bd-d85969ab5d2b',
   auth: `${AUTH_BASE}?resource=admin`,
   statuses: 'https://functions.poehali.dev/b59cb5c9-4937-4c43-b5ad-a535c69620cf',
+
+  // News — через tariffs функцию (исправлено)
+  news: `${TARIFFS_BASE}?resource=news`,
 
   // Users & Drivers — через auth функцию
   users: `${AUTH_BASE}?resource=users`,
@@ -23,4 +25,8 @@ export const API_URLS = {
 
   // Services — через tariffs
   services: `${TARIFFS_BASE}?resource=services`,
+
+  // Transfer types & Car classes — через tariffs
+  transferTypes: `${TARIFFS_BASE}?resource=transfer_types`,
+  carClasses: `${TARIFFS_BASE}?resource=car_classes`,
 };

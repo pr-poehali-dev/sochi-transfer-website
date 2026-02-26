@@ -52,7 +52,7 @@ const Index = () => {
         fetch(`${API_URLS.tariffs}?active=true`),
         fetch(`${API_URLS.fleet}?active=true`),
         fetch(`${API_URLS.reviews}&action=approved`),
-        fetch(`${API_URLS.news}&published=true`),
+        fetch(API_URLS.news),
         fetch(API_URLS.settings)
       ]);
       const td = await tariffsRes.json(); setTariffs(td.tariffs || []);
