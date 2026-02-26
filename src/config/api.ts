@@ -1,11 +1,23 @@
-const BASE = 'https://functions.poehali.dev/bb30d9f0-aad2-4e73-a102-04fb8211f7ae';
+const ORDERS_BASE = 'https://functions.poehali.dev/bb30d9f0-aad2-4e73-a102-04fb8211f7ae';
+const TARIFFS_BASE = 'https://functions.poehali.dev/e23d53dd-f58b-49c6-a1a9-a061650d1533';
+const AUTH_BASE = 'https://functions.poehali.dev/dee3e5d3-4d65-42a4-9f03-07733fae849e';
 
 export const API_URLS = {
-  orders: BASE,
-  rideshares: `${BASE}?resource=rideshares`,
-  paymentSettings: `${BASE}?resource=payment_settings`,
-  tariffs: 'https://functions.poehali.dev/e23d53dd-f58b-49c6-a1a9-a061650d1533',
+  orders: ORDERS_BASE,
+  rideshares: `${ORDERS_BASE}?resource=rideshares`,
+  paymentSettings: `${ORDERS_BASE}?resource=payment_settings`,
+  tariffs: TARIFFS_BASE,
   fleet: 'https://functions.poehali.dev/cbf23917-dd96-4252-96bd-d85969ab5d2b',
-  auth: 'https://functions.poehali.dev/dee3e5d3-4d65-42a4-9f03-07733fae849e',
-  statuses: 'https://functions.poehali.dev/b59cb5c9-4937-4c43-b5ad-a535c69620cf'
+  auth: `${AUTH_BASE}?resource=admin`,
+  statuses: 'https://functions.poehali.dev/b59cb5c9-4937-4c43-b5ad-a535c69620cf',
+
+  // Settings, News, Reviews, Services — через tariffs функцию
+  settings: `${TARIFFS_BASE}?resource=settings`,
+  news: `${TARIFFS_BASE}?resource=news`,
+  reviews: `${TARIFFS_BASE}?resource=reviews`,
+  services: `${TARIFFS_BASE}?resource=services`,
+
+  // Users & Drivers — через auth функцию
+  users: `${AUTH_BASE}?resource=users`,
+  drivers: `${AUTH_BASE}?resource=drivers`,
 };

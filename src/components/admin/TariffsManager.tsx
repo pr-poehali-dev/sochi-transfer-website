@@ -17,6 +17,7 @@ interface Tariff {
   distance: string;
   duration: string;
   image_emoji: string;
+  image_url: string | null;
   is_active: boolean;
 }
 
@@ -34,7 +35,8 @@ const TariffsManager = ({ onUpdate }: TariffsManagerProps) => {
     distance: '',
     duration: '',
     image_emoji: '🚗',
-    is_active: true
+    is_active: true,
+    image_base64: ''
   });
   const { toast } = useToast();
 
@@ -110,7 +112,15 @@ const TariffsManager = ({ onUpdate }: TariffsManagerProps) => {
 
   const resetForm = () => {
     setEditingTariff(null);
-    setFormData({ city: '', price: '', distance: '', duration: '', image_emoji: '🚗', is_active: true });
+    setFormData({ city: '', price: '', distance: '', duration: '', image_emoji: '🚗', is_active: true, image_base64: '' });
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setFormData(f => ({ ...f, image_base64: reader.result as string }));
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -139,9 +149,14 @@ const TariffsManager = ({ onUpdate }: TariffsManagerProps) => {
                   <Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Эмодзи</Label>
+                  <Label>Эмодзи (если нет фото)</Label>
                   <Input value={formData.image_emoji} onChange={(e) => setFormData({ ...formData, image_emoji: e.target.value })} />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Фото направления</Label>
+                <Input type="file" accept="image/*" onChange={handleImageUpload} />
+                {formData.image_base64 && <p className="text-xs text-green-600">✓ Изображение выбрано</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -178,7 +193,11 @@ const TariffsManager = ({ onUpdate }: TariffsManagerProps) => {
             {tariffs.map((tariff) => (
               <TableRow key={tariff.id}>
                 <TableCell className="font-medium">
-                  <span className="mr-2">{tariff.image_emoji}</span>
+                  {tariff.image_url ? (
+                    <img src={tariff.image_url} alt={tariff.city} className="w-8 h-8 rounded object-cover inline-block mr-2" />
+                  ) : (
+                    <span className="mr-2">{tariff.image_emoji}</span>
+                  )}
                   {tariff.city}
                 </TableCell>
                 <TableCell>{tariff.price} ₽</TableCell>

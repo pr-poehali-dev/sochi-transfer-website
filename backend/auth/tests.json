@@ -3,8 +3,9 @@
     {
       "name": "Login with valid credentials",
       "method": "POST",
-      "path": "/",
+      "path": "/?resource=admin",
       "body": {
+        "action": "login",
         "email": "mydavidmy@mail.ru",
         "password": "131999davidmy"
       },

@@ -25,7 +25,7 @@ const AdminLogin = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ action: 'login', email, password }),
       });
 
       const data = await response.json();
@@ -34,6 +34,7 @@ const AdminLogin = () => {
         localStorage.setItem('admin_token', data.token);
         localStorage.setItem('admin_email', data.admin.email);
         localStorage.setItem('admin_name', data.admin.name);
+        localStorage.setItem('admin_role', data.admin.role || 'admin');
         
         toast({
           title: 'Успешный вход',

@@ -18,7 +18,7 @@ interface Tariff {
 
 const TRANSFER_TYPES = [
   { value: 'individual', label: 'Индивидуальный', description: 'Только для вас', icon: 'User' },
-  { value: 'group', label: 'Групповой', description: 'Минивэн / автобус', icon: 'Users' },
+  { value: 'group', label: 'Групповой', description: '1 500 ₽ с человека', icon: 'Users' },
 ];
 
 const CAR_CLASSES = [
@@ -66,7 +66,11 @@ const BookingForm = () => {
     }
   };
 
-  const calcPrice = (base: number, cls: string, type: string) => {
+  const calcPrice = (base: number, cls: string, type: string, pCount?: number) => {
+    if (type === 'group') {
+      const pricePerPerson = 1500;
+      return Math.round(pricePerPerson * (pCount || parseInt(formData.passengers_count) || 1));
+    }
     const classMultiplier = CAR_CLASSES.find(c => c.value === cls)?.multiplier || 1;
     return Math.round(base * classMultiplier);
   };
@@ -97,7 +101,8 @@ const BookingForm = () => {
 
   const handleTransferTypeChange = (type: string) => {
     setTransferType(type);
-    setFormData(prev => ({ ...prev, transfer_type: type }));
+    const price = basePrice > 0 ? calcPrice(basePrice, carClass, type) : 0;
+    setFormData(prev => ({ ...prev, transfer_type: type, price }));
   };
 
   const prepayAmount = Math.round(formData.price * 0.3);
