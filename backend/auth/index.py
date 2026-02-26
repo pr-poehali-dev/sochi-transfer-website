@@ -312,8 +312,206 @@ def handle_drivers(method, event, params, data, headers):
     return resp(405, {'error': 'Method not allowed'})
 
 
+def handle_reviews(method, event, params, data, headers):
+    user_id = headers.get('X-User-Id') or params.get('user_id')
+    conn = get_conn(); cur = conn.cursor()
+
+    if method == 'GET':
+        action = params.get('action', 'approved')
+        if action == 'approved':
+            cur.execute(f"SELECT id,author_name,rating,text,type,source,created_at,driver_id FROM {SCHEMA}.reviews WHERE is_approved=true ORDER BY created_at DESC LIMIT 50")
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'reviews': rows})
+        elif action == 'driver' and params.get('driver_id'):
+            did = int(params['driver_id'])
+            cur.execute(f"SELECT id,author_name,rating,text,created_at,admin_reply FROM {SCHEMA}.reviews WHERE driver_id={did} AND is_approved=true ORDER BY created_at DESC")
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'reviews': rows})
+        elif action == 'list':
+            cur.execute(f"SELECT r.id,r.author_name,r.rating,r.text,r.type,r.source,r.status,r.is_approved,r.created_at,r.driver_id,r.user_id,r.order_id,r.admin_reply,d.name as driver_name FROM {SCHEMA}.reviews r LEFT JOIN {SCHEMA}.drivers d ON r.driver_id=d.id ORDER BY r.created_at DESC")
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'reviews': rows})
+
+    elif method == 'POST':
+        text = data.get('text', '').strip()
+        if not text:
+            cur.close(); conn.close()
+            return resp(400, {'error': 'Текст отзыва обязателен'})
+        driver_id = data.get('driver_id')
+        order_id = data.get('order_id')
+        cur.execute(f"INSERT INTO {SCHEMA}.reviews (author_name,rating,text,type,source,user_id,driver_id,order_id,status,is_approved) VALUES (%s,%s,%s,%s,'site',%s,%s,%s,'pending',false) RETURNING id",
+            (data.get('author_name','Аноним'), int(data.get('rating',5)), text, data.get('type','service'),
+             int(user_id) if user_id else None, int(driver_id) if driver_id else None, int(order_id) if order_id else None))
+        rid = cur.fetchone()[0]
+        conn.commit(); cur.close(); conn.close()
+        return resp(201, {'id': rid, 'message': 'Отзыв отправлен на модерацию'})
+
+    elif method == 'PUT':
+        rid = data.get('id')
+        action = data.get('action', 'moderate')
+        if action == 'moderate':
+            is_approved = data.get('is_approved', False)
+            status = 'approved' if is_approved else 'rejected'
+            cur.execute(f"UPDATE {SCHEMA}.reviews SET is_approved=%s,status=%s WHERE id=%s", (is_approved, status, int(rid)))
+        elif action == 'reply':
+            cur.execute(f"UPDATE {SCHEMA}.reviews SET admin_reply=%s WHERE id=%s", (data.get('reply',''), int(rid)))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Обновлено'})
+
+    elif method == 'DELETE':
+        rid = params.get('id') or data.get('id')
+        if rid:
+            cur.execute(f"DELETE FROM {SCHEMA}.reviews WHERE id={int(rid)}")
+            conn.commit()
+        cur.close(); conn.close()
+        return resp(200, {'message': 'Удалено'})
+
+    cur.close(); conn.close()
+    return resp(405, {'error': 'Method not allowed'})
+
+
+def handle_settings(method, event, params, data):
+    conn = get_conn(); cur = conn.cursor()
+
+    if method == 'GET':
+        cur.execute(f"SELECT key, value FROM {SCHEMA}.site_settings ORDER BY id")
+        rows = cur.fetchall()
+        settings = {row[0]: row[1] for row in rows}
+        cur.close(); conn.close()
+        return resp(200, {'settings': settings})
+
+    elif method in ('POST', 'PUT'):
+        settings = data.get('settings', {})
+        for key, value in settings.items():
+            cur.execute(f"INSERT INTO {SCHEMA}.site_settings (key,value,updated_at) VALUES (%s,%s,NOW()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()",
+                        (str(key), str(value) if value is not None else ''))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Настройки сохранены'})
+
+    cur.close(); conn.close()
+    return resp(405, {'error': 'Method not allowed'})
+
+
+def handle_balance(method, event, params, data, headers):
+    user_id = headers.get('X-User-Id') or params.get('user_id')
+    driver_id = headers.get('X-Driver-Id') or params.get('driver_id')
+    conn = get_conn(); cur = conn.cursor()
+
+    if method == 'GET':
+        action = params.get('action', 'transactions')
+        if action == 'transactions':
+            if user_id:
+                cur.execute(f"SELECT id,amount,type,description,status,created_at FROM {SCHEMA}.balance_transactions WHERE user_id={int(user_id)} ORDER BY created_at DESC LIMIT 50")
+            elif driver_id:
+                cur.execute(f"SELECT id,amount,type,description,status,created_at FROM {SCHEMA}.balance_transactions WHERE driver_id={int(driver_id)} ORDER BY created_at DESC LIMIT 50")
+            else:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'user_id или driver_id обязателен'})
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'transactions': rows})
+        elif action == 'withdrawals':
+            cur.execute(f"SELECT w.id,w.amount,w.requisites,w.status,w.admin_note,w.created_at,u.name as user_name,u.phone as user_phone,d.name as driver_name,d.phone as driver_phone FROM {SCHEMA}.withdrawal_requests w LEFT JOIN {SCHEMA}.users u ON w.user_id=u.id LEFT JOIN {SCHEMA}.drivers d ON w.driver_id=d.id ORDER BY w.created_at DESC")
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'withdrawals': rows})
+        elif action == 'deposits':
+            cur.execute(f"SELECT dp.id,dp.amount,dp.payment_method,dp.status,dp.admin_note,dp.created_at,u.name as user_name,u.phone as user_phone,d.name as driver_name,d.phone as driver_phone FROM {SCHEMA}.deposit_requests dp LEFT JOIN {SCHEMA}.users u ON dp.user_id=u.id LEFT JOIN {SCHEMA}.drivers d ON dp.driver_id=d.id ORDER BY dp.created_at DESC")
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'deposits': rows})
+
+    elif method == 'POST':
+        action = data.get('action', 'withdraw')
+        amount = float(data.get('amount', 0))
+        uid = int(user_id) if user_id else None
+        did = int(driver_id) if driver_id else None
+
+        if action == 'withdraw':
+            requisites = data.get('requisites', '').strip()
+            if amount <= 0 or not requisites:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'Сумма и реквизиты обязательны'})
+            if uid:
+                cur.execute(f"SELECT balance FROM {SCHEMA}.users WHERE id={uid}")
+            elif did:
+                cur.execute(f"SELECT balance FROM {SCHEMA}.drivers WHERE id={did}")
+            row = cur.fetchone()
+            if not row or float(row[0]) < amount:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'Недостаточно средств'})
+            cur.execute(f"INSERT INTO {SCHEMA}.withdrawal_requests (user_id,driver_id,amount,requisites,status) VALUES (%s,%s,%s,%s,'pending') RETURNING id",
+                        (uid, did, amount, requisites))
+            wid = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            return resp(201, {'id': wid, 'message': 'Заявка на вывод создана'})
+
+        elif action == 'deposit':
+            payment_method = data.get('payment_method', '').strip()
+            if amount <= 0:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'Сумма обязательна'})
+            cur.execute(f"INSERT INTO {SCHEMA}.deposit_requests (user_id,driver_id,amount,payment_method,status) VALUES (%s,%s,%s,%s,'pending') RETURNING id",
+                        (uid, did, amount, payment_method))
+            dep_id = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            return resp(201, {'id': dep_id, 'message': 'Заявка на пополнение создана'})
+
+    elif method == 'PUT':
+        action = data.get('action', '')
+        if action == 'approve_withdrawal':
+            wid = int(data.get('id'))
+            cur.execute(f"SELECT user_id,driver_id,amount FROM {SCHEMA}.withdrawal_requests WHERE id={wid}")
+            row = cur.fetchone()
+            if row:
+                uid, did, amount = row
+                cur.execute(f"UPDATE {SCHEMA}.withdrawal_requests SET status='completed',admin_note=%s,updated_at=NOW() WHERE id={wid}", (data.get('note',''),))
+                if uid:
+                    cur.execute(f"UPDATE {SCHEMA}.users SET balance=balance-{float(amount)} WHERE id={uid}")
+                    cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (user_id,amount,type,description,status) VALUES ({uid},{-float(amount)},'withdrawal','Вывод средств','completed')")
+                elif did:
+                    cur.execute(f"UPDATE {SCHEMA}.drivers SET balance=balance-{float(amount)} WHERE id={did}")
+                    cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (driver_id,amount,type,description,status) VALUES ({did},{-float(amount)},'withdrawal','Вывод средств','completed')")
+                conn.commit()
+            cur.close(); conn.close()
+            return resp(200, {'message': 'Вывод одобрен'})
+        elif action == 'reject_withdrawal':
+            wid = int(data.get('id'))
+            cur.execute(f"UPDATE {SCHEMA}.withdrawal_requests SET status='rejected',admin_note=%s,updated_at=NOW() WHERE id={wid}", (data.get('note',''),))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Вывод отклонён'})
+        elif action == 'approve_deposit':
+            dep_id = int(data.get('id'))
+            cur.execute(f"SELECT user_id,driver_id,amount FROM {SCHEMA}.deposit_requests WHERE id={dep_id}")
+            row = cur.fetchone()
+            if row:
+                uid, did, amount = row
+                cur.execute(f"UPDATE {SCHEMA}.deposit_requests SET status='completed',admin_note=%s,updated_at=NOW() WHERE id={dep_id}", (data.get('note',''),))
+                if uid:
+                    cur.execute(f"UPDATE {SCHEMA}.users SET balance=balance+{float(amount)} WHERE id={uid}")
+                    cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (user_id,amount,type,description,status) VALUES ({uid},{float(amount)},'deposit','Пополнение баланса','completed')")
+                elif did:
+                    cur.execute(f"UPDATE {SCHEMA}.drivers SET balance=balance+{float(amount)} WHERE id={did}")
+                    cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (driver_id,amount,type,description,status) VALUES ({did},{float(amount)},'deposit','Пополнение баланса','completed')")
+                conn.commit()
+            cur.close(); conn.close()
+            return resp(200, {'message': 'Пополнение одобрено'})
+
+    cur.close(); conn.close()
+    return resp(405, {'error': 'Method not allowed'})
+
+
 def handler(event: dict, context) -> dict:
-    '''Мультироутер авторизации: admin, users, drivers — по параметру ?resource='''
+    '''Мультироутер авторизации: admin, users, drivers, reviews, settings, balance — по параметру ?resource='''
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': {**CORS, 'Access-Control-Max-Age': '86400'}, 'body': ''}
 
@@ -333,6 +531,12 @@ def handler(event: dict, context) -> dict:
             return handle_users(method, event, params, data, headers)
         elif resource == 'drivers':
             return handle_drivers(method, event, params, data, headers)
+        elif resource == 'reviews':
+            return handle_reviews(method, event, params, data, headers)
+        elif resource == 'settings':
+            return handle_settings(method, event, params, data)
+        elif resource == 'balance':
+            return handle_balance(method, event, params, data, headers)
         else:
             return handle_admin(method, event, params, data)
     except Exception as e:

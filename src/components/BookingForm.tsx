@@ -112,14 +112,19 @@ const BookingForm = () => {
     setIsLoading(true);
 
     try {
+      const userId = localStorage.getItem('user_id');
       const response = await fetch(API_URLS.orders, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(userId ? { 'X-User-Id': userId } : {})
+        },
         body: JSON.stringify({
           ...formData,
           tariff_id: parseInt(formData.tariff_id),
           status_id: 1,
           passengers_count: parseInt(formData.passengers_count),
+          user_id: userId ? parseInt(userId) : null,
         }),
       });
 
@@ -162,20 +167,20 @@ const BookingForm = () => {
             {/* Тип трансфера */}
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Тип трансфера</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {TRANSFER_TYPES.map(type => (
                   <button
                     key={type.value}
                     type="button"
                     onClick={() => handleTransferTypeChange(type.value)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left w-full ${
                       transferType === type.value
                         ? 'border-primary bg-primary/10'
                         : 'border-border bg-white/50 hover:border-primary/40'
                     }`}
                   >
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${transferType === type.value ? 'gradient-primary' : 'bg-muted'}`}>
-                      <Icon name={type.icon as 'User' | 'Users'} className={`h-4 w-4 ${transferType === type.value ? 'text-white' : 'text-muted-foreground'}`} />
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${transferType === type.value ? 'gradient-primary' : 'bg-muted'}`}>
+                      <Icon name={type.icon as 'User' | 'Users'} className={`h-5 w-5 ${transferType === type.value ? 'text-white' : 'text-muted-foreground'}`} />
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{type.label}</p>

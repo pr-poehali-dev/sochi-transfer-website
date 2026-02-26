@@ -6,18 +6,21 @@ export const API_URLS = {
   orders: ORDERS_BASE,
   rideshares: `${ORDERS_BASE}?resource=rideshares`,
   paymentSettings: `${ORDERS_BASE}?resource=payment_settings`,
+  news: `${ORDERS_BASE}?resource=news`,
   tariffs: TARIFFS_BASE,
   fleet: 'https://functions.poehali.dev/cbf23917-dd96-4252-96bd-d85969ab5d2b',
   auth: `${AUTH_BASE}?resource=admin`,
   statuses: 'https://functions.poehali.dev/b59cb5c9-4937-4c43-b5ad-a535c69620cf',
 
-  // Settings, News, Reviews, Services — через tariffs функцию
-  settings: `${TARIFFS_BASE}?resource=settings`,
-  news: `${TARIFFS_BASE}?resource=news`,
-  reviews: `${TARIFFS_BASE}?resource=reviews`,
-  services: `${TARIFFS_BASE}?resource=services`,
-
   // Users & Drivers — через auth функцию
   users: `${AUTH_BASE}?resource=users`,
   drivers: `${AUTH_BASE}?resource=drivers`,
+
+  // Reviews, Settings, Balance — через auth функцию
+  reviews: `${AUTH_BASE}?resource=reviews`,
+  settings: `${AUTH_BASE}?resource=settings`,
+  balance: `${AUTH_BASE}?resource=balance`,
+
+  // Services — через tariffs
+  services: `${TARIFFS_BASE}?resource=services`,
 };

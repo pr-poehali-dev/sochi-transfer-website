@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { API_URLS } from '@/config/api';
@@ -16,12 +17,40 @@ import ReviewsManager from '@/components/admin/ReviewsManager';
 import DriversManager from '@/components/admin/DriversManager';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
 
+interface Withdrawal {
+  id: number;
+  amount: number;
+  requisites: string;
+  status: string;
+  admin_note: string;
+  created_at: string;
+  user_name?: string;
+  user_phone?: string;
+  driver_name?: string;
+  driver_phone?: string;
+}
+
+interface Deposit {
+  id: number;
+  amount: number;
+  payment_method: string;
+  status: string;
+  admin_note: string;
+  created_at: string;
+  user_name?: string;
+  user_phone?: string;
+  driver_name?: string;
+  driver_phone?: string;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [adminName, setAdminName] = useState('');
   const [adminRole, setAdminRole] = useState('admin');
   const [stats, setStats] = useState({ totalOrders: 0, newOrders: 0, activeTariffs: 0, activeFleet: 0, pendingDrivers: 0 });
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
@@ -31,6 +60,7 @@ const AdminDashboard = () => {
     setAdminName(name || 'Администратор');
     setAdminRole(role);
     loadStats();
+    loadFinance();
   }, [navigate]);
 
   const loadStats = async () => {
@@ -54,6 +84,47 @@ const AdminDashboard = () => {
         pendingDrivers: pending
       });
     } catch { /* silent */ }
+  };
+
+  const loadFinance = async () => {
+    try {
+      const [wRes, dRes] = await Promise.all([
+        fetch(`${API_URLS.balance}&action=withdrawals`),
+        fetch(`${API_URLS.balance}&action=deposits`)
+      ]);
+      const wd = await wRes.json(); setWithdrawals(wd.withdrawals || []);
+      const dd = await dRes.json(); setDeposits(dd.deposits || []);
+    } catch { /* silent */ }
+  };
+
+  const approveWithdrawal = async (id: number) => {
+    await fetch(API_URLS.balance, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve_withdrawal', id })
+    });
+    toast({ title: 'Вывод одобрен' });
+    loadFinance();
+  };
+
+  const rejectWithdrawal = async (id: number) => {
+    await fetch(API_URLS.balance, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject_withdrawal', id })
+    });
+    toast({ title: 'Вывод отклонён' });
+    loadFinance();
+  };
+
+  const approveDeposit = async (id: number) => {
+    await fetch(API_URLS.balance, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve_deposit', id })
+    });
+    toast({ title: 'Пополнение одобрено' });
+    loadFinance();
   };
 
   const handleLogout = () => {
@@ -155,6 +226,15 @@ const AdminDashboard = () => {
                 <Icon name="CreditCard" className="mr-1.5 h-4 w-4" />
                 Оплата
               </TabsTrigger>
+              <TabsTrigger value="finance">
+                <Icon name="Wallet" className="mr-1.5 h-4 w-4" />
+                Финансы
+                {withdrawals.filter(w => w.status === 'pending').length + deposits.filter(d => d.status === 'pending').length > 0 && (
+                  <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                    {withdrawals.filter(w => w.status === 'pending').length + deposits.filter(d => d.status === 'pending').length}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="settings">
                 <Icon name="Settings" className="mr-1.5 h-4 w-4" />
                 Настройки
@@ -192,6 +272,97 @@ const AdminDashboard = () => {
 
           <TabsContent value="payment">
             <PaymentSettingsManager />
+          </TabsContent>
+
+          <TabsContent value="finance">
+            <div className="space-y-6">
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Icon name="ArrowUpRight" className="h-5 w-5 text-red-500" />
+                    Заявки на вывод средств
+                    {withdrawals.filter(w => w.status === 'pending').length > 0 && (
+                      <Badge className="bg-red-500 text-white">{withdrawals.filter(w => w.status === 'pending').length} новых</Badge>
+                    )}
+                  </h3>
+                  {withdrawals.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-6">Заявок нет</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {withdrawals.map(w => (
+                        <div key={w.id} className={`p-4 border rounded-lg ${w.status === 'pending' ? 'border-yellow-300 bg-yellow-50/50' : ''}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium">{w.user_name || w.driver_name || 'Неизвестно'}</span>
+                                <span className="text-xs text-muted-foreground">{w.user_phone || w.driver_phone}</span>
+                                <Badge variant={w.status === 'pending' ? 'secondary' : w.status === 'completed' ? 'default' : 'destructive'} className="text-xs">
+                                  {w.status === 'pending' ? 'Ожидает' : w.status === 'completed' ? 'Выполнен' : 'Отклонён'}
+                                </Badge>
+                              </div>
+                              <p className="text-2xl font-bold text-gradient mb-1">{Number(w.amount).toFixed(2)} ₽</p>
+                              <p className="text-sm text-muted-foreground">Реквизиты: {w.requisites}</p>
+                              <p className="text-xs text-muted-foreground">{new Date(w.created_at).toLocaleString('ru')}</p>
+                            </div>
+                            {w.status === 'pending' && (
+                              <div className="flex flex-col gap-2 flex-shrink-0">
+                                <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white text-xs" onClick={() => approveWithdrawal(w.id)}>
+                                  <Icon name="Check" className="h-3 w-3 mr-1" />Выплатить
+                                </Button>
+                                <Button size="sm" variant="destructive" className="text-xs" onClick={() => rejectWithdrawal(w.id)}>
+                                  <Icon name="X" className="h-3 w-3 mr-1" />Отклонить
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Icon name="Plus" className="h-5 w-5 text-green-500" />
+                    Заявки на пополнение баланса
+                    {deposits.filter(d => d.status === 'pending').length > 0 && (
+                      <Badge className="bg-green-500 text-white">{deposits.filter(d => d.status === 'pending').length} новых</Badge>
+                    )}
+                  </h3>
+                  {deposits.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-6">Заявок нет</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {deposits.map(d => (
+                        <div key={d.id} className={`p-4 border rounded-lg ${d.status === 'pending' ? 'border-green-300 bg-green-50/50' : ''}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium">{d.user_name || d.driver_name || 'Неизвестно'}</span>
+                                <span className="text-xs text-muted-foreground">{d.user_phone || d.driver_phone}</span>
+                                <Badge variant={d.status === 'pending' ? 'secondary' : d.status === 'completed' ? 'default' : 'destructive'} className="text-xs">
+                                  {d.status === 'pending' ? 'Ожидает' : d.status === 'completed' ? 'Зачислено' : 'Отклонено'}
+                                </Badge>
+                              </div>
+                              <p className="text-2xl font-bold text-green-600 mb-1">+{Number(d.amount).toFixed(2)} ₽</p>
+                              <p className="text-sm text-muted-foreground">Способ: {d.payment_method || 'не указан'}</p>
+                              <p className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleString('ru')}</p>
+                            </div>
+                            {d.status === 'pending' && (
+                              <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white text-xs flex-shrink-0" onClick={() => approveDeposit(d.id)}>
+                                <Icon name="Check" className="h-3 w-3 mr-1" />Зачислить
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="settings">

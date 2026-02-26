@@ -126,36 +126,65 @@ const SiteSettingsManager = () => {
       </TabsContent>
 
       <TabsContent value="messengers">
-        <Card>
-          <CardHeader><CardTitle>Мессенджеры и контакты</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>WhatsApp номер (без +)</Label>
-              <Input value={settings['whatsapp_number'] || ''} onChange={e => set('whatsapp_number', e.target.value)} placeholder="79001234567" />
-            </div>
-            <div>
-              <Label>Telegram username (без @)</Label>
-              <Input value={settings['telegram_username'] || ''} onChange={e => set('telegram_username', e.target.value)} placeholder="poehaliplus" />
-            </div>
-            <div>
-              <Label>MAX (ВКонтакте) ссылка или username</Label>
-              <Input value={settings['max_username'] || ''} onChange={e => set('max_username', e.target.value)} placeholder="poehaliplus" />
-            </div>
-            <div>
-              <Label>Телефон компании</Label>
-              <Input value={settings['company_phone'] || ''} onChange={e => set('company_phone', e.target.value)} placeholder="+7 (912) 345-67-89" />
-            </div>
-            <div>
-              <Label>Email компании</Label>
-              <Input value={settings['company_email'] || ''} onChange={e => set('company_email', e.target.value)} />
-            </div>
-            <div>
-              <Label>Адрес</Label>
-              <Input value={settings['company_address'] || ''} onChange={e => set('company_address', e.target.value)} />
-            </div>
-            <SaveButton keys={['whatsapp_number', 'telegram_username', 'max_username', 'company_phone', 'company_email', 'company_address']} />
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Мессенджеры</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>WhatsApp номер (без +, например: 79001234567)</Label>
+                <Input value={settings['whatsapp_number'] || ''} onChange={e => set('whatsapp_number', e.target.value)} placeholder="79001234567" />
+              </div>
+              <div>
+                <Label>Telegram username (без @)</Label>
+                <Input value={settings['telegram_username'] || ''} onChange={e => set('telegram_username', e.target.value)} placeholder="poehaliplus" />
+              </div>
+              <div>
+                <Label>Viber номер (без +)</Label>
+                <Input value={settings['viber_number'] || ''} onChange={e => set('viber_number', e.target.value)} placeholder="79001234567" />
+              </div>
+              <div>
+                <Label>Телефон компании</Label>
+                <Input value={settings['company_phone'] || ''} onChange={e => set('company_phone', e.target.value)} placeholder="+7 (912) 345-67-89" />
+              </div>
+              <div>
+                <Label>Email компании</Label>
+                <Input value={settings['company_email'] || ''} onChange={e => set('company_email', e.target.value)} />
+              </div>
+              <div>
+                <Label>Адрес</Label>
+                <Input value={settings['company_address'] || ''} onChange={e => set('company_address', e.target.value)} />
+              </div>
+              <SaveButton keys={['whatsapp_number', 'telegram_username', 'viber_number', 'company_phone', 'company_email', 'company_address']} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Социальные сети</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>ВКонтакте / MAX (полная ссылка)</Label>
+                <Input value={settings['vk_url'] || ''} onChange={e => set('vk_url', e.target.value)} placeholder="https://vk.com/poehaliplus" />
+              </div>
+              <div>
+                <Label>Instagram (полная ссылка)</Label>
+                <Input value={settings['instagram_url'] || ''} onChange={e => set('instagram_url', e.target.value)} placeholder="https://instagram.com/poehaliplus" />
+              </div>
+              <div>
+                <Label>YouTube (полная ссылка)</Label>
+                <Input value={settings['youtube_url'] || ''} onChange={e => set('youtube_url', e.target.value)} placeholder="https://youtube.com/@poehaliplus" />
+              </div>
+              <div>
+                <Label>TikTok (полная ссылка)</Label>
+                <Input value={settings['tiktok_url'] || ''} onChange={e => set('tiktok_url', e.target.value)} placeholder="https://tiktok.com/@poehaliplus" />
+              </div>
+              <div>
+                <Label>Facebook (полная ссылка)</Label>
+                <Input value={settings['facebook_url'] || ''} onChange={e => set('facebook_url', e.target.value)} placeholder="https://facebook.com/poehaliplus" />
+              </div>
+              <SaveButton keys={['vk_url', 'instagram_url', 'youtube_url', 'tiktok_url', 'facebook_url']} />
+            </CardContent>
+          </Card>
+        </div>
       </TabsContent>
 
       <TabsContent value="metrika">

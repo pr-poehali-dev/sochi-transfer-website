@@ -86,13 +86,15 @@ def handle_orders(method, event):
     elif method == 'POST':
         data = json.loads(event.get('body', '{}'))
         prepay_amount = round((data.get('price', 0) or 0) * 0.3) if data.get('payment_type') == 'prepay' else 0
+        headers = event.get('headers', {}) or {}
+        user_id = headers.get('X-User-Id') or data.get('user_id')
         cur.execute(f'''
             INSERT INTO {SCHEMA}.orders (
                 from_location, to_location, pickup_datetime, flight_number,
                 passenger_name, passenger_phone, passenger_email,
                 passengers_count, luggage_count, tariff_id, fleet_id,
-                status_id, price, notes, transfer_type, car_class, payment_type, prepay_amount
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                status_id, price, notes, transfer_type, car_class, payment_type, prepay_amount, user_id
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
         ''', (
             data.get('from_location'), data.get('to_location'), data.get('pickup_datetime'),
             data.get('flight_number'), data.get('passenger_name'), data.get('passenger_phone'),
@@ -100,7 +102,8 @@ def handle_orders(method, event):
             data.get('tariff_id'), data.get('fleet_id'), data.get('status_id', 1),
             data.get('price'), data.get('notes'),
             data.get('transfer_type', 'individual'), data.get('car_class', 'comfort'),
-            data.get('payment_type', 'full'), prepay_amount
+            data.get('payment_type', 'full'), prepay_amount,
+            int(user_id) if user_id else None
         ))
         oid = cur.fetchone()[0]
         conn.commit(); cur.close(); conn.close()
@@ -250,8 +253,100 @@ def handle_payment_settings(method, event):
     return resp(405, {'error': 'Method not allowed'})
 
 
+def handle_news(method, event):
+    conn = get_conn()
+    cur = conn.cursor()
+    params = event.get('queryStringParameters', {}) or {}
+    data = {}
+    if event.get('body'):
+        try:
+            data = json.loads(event.get('body', '{}'))
+        except Exception:
+            pass
+
+    if method == 'GET':
+        published_only = params.get('published', 'false') == 'true'
+        if published_only:
+            cur.execute(f"SELECT id,title,summary,content,image_url,published_at,created_at FROM {SCHEMA}.news WHERE is_published=true ORDER BY published_at DESC LIMIT 20")
+        else:
+            cur.execute(f"SELECT id,title,summary,content,image_url,is_published,published_at,created_at FROM {SCHEMA}.news ORDER BY created_at DESC")
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return resp(200, {'news': rows})
+
+    elif method == 'POST':
+        import base64, boto3, os as _os
+        title = data.get('title', '').strip()
+        if not title:
+            cur.close(); conn.close()
+            return resp(400, {'error': 'Заголовок обязателен'})
+        image_url = ''
+        if data.get('image_b64'):
+            b64 = data['image_b64']
+            if ',' in b64:
+                b64 = b64.split(',', 1)[1]
+            img_data = base64.b64decode(b64)
+            s3 = boto3.client('s3', endpoint_url='https://bucket.poehali.dev',
+                aws_access_key_id=_os.environ['AWS_ACCESS_KEY_ID'],
+                aws_secret_access_key=_os.environ['AWS_SECRET_ACCESS_KEY'])
+            key = f"news/{secrets.token_hex(8)}.jpg"
+            s3.put_object(Bucket='files', Key=key, Body=img_data, ContentType='image/jpeg')
+            image_url = f"https://cdn.poehali.dev/projects/{_os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+        pub_at = 'NOW()' if data.get('is_published') else None
+        if pub_at:
+            cur.execute(f'''
+                INSERT INTO {SCHEMA}.news (title, content, image_url, is_published, published_at)
+                VALUES (%s, %s, %s, %s, NOW()) RETURNING id
+            ''', (title, data.get('content',''), image_url, True))
+        else:
+            cur.execute(f'''
+                INSERT INTO {SCHEMA}.news (title, content, image_url, is_published)
+                VALUES (%s, %s, %s, %s) RETURNING id
+            ''', (title, data.get('content',''), image_url, False))
+        nid = cur.fetchone()[0]
+        conn.commit(); cur.close(); conn.close()
+        return resp(201, {'id': nid, 'message': 'Новость создана'})
+
+    elif method == 'PUT':
+        import base64, boto3, os as _os
+        nid = data.get('id')
+        image_url = data.get('image_url', '')
+        if data.get('image_b64'):
+            b64 = data['image_b64']
+            if ',' in b64:
+                b64 = b64.split(',', 1)[1]
+            img_data = base64.b64decode(b64)
+            s3 = boto3.client('s3', endpoint_url='https://bucket.poehali.dev',
+                aws_access_key_id=_os.environ['AWS_ACCESS_KEY_ID'],
+                aws_secret_access_key=_os.environ['AWS_SECRET_ACCESS_KEY'])
+            key = f"news/{secrets.token_hex(8)}.jpg"
+            s3.put_object(Bucket='files', Key=key, Body=img_data, ContentType='image/jpeg')
+            image_url = f"https://cdn.poehali.dev/projects/{_os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+        is_pub = data.get('is_published', False)
+        cur.execute(f'''
+            UPDATE {SCHEMA}.news SET title=%s, content=%s, image_url=%s,
+            is_published=%s, published_at=CASE WHEN %s THEN NOW() ELSE published_at END
+            WHERE id=%s
+        ''', (data.get('title'), data.get('content',''),
+              image_url, is_pub, is_pub, int(nid)))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Новость обновлена'})
+
+    elif method == 'DELETE':
+        nid = params.get('id') or data.get('id')
+        if nid:
+            cur.execute(f"DELETE FROM {SCHEMA}.news WHERE id={int(nid)}")
+            conn.commit()
+        cur.close(); conn.close()
+        return resp(200, {'message': 'Удалено'})
+
+    cur.close(); conn.close()
+    return resp(405, {'error': 'Method not allowed'})
+
+
 def handler(event: dict, context) -> dict:
-    '''Мультироутер API: orders, rideshares, payment_settings — по параметру ?resource='''
+    '''Мультироутер API: orders, rideshares, payment_settings, news — по параметру ?resource='''
     method = event.get('httpMethod', 'GET')
 
     if method == 'OPTIONS':
@@ -265,6 +360,8 @@ def handler(event: dict, context) -> dict:
             return handle_rideshares(method, event)
         elif resource == 'payment_settings':
             return handle_payment_settings(method, event)
+        elif resource == 'news':
+            return handle_news(method, event)
         else:
             return handle_orders(method, event)
 

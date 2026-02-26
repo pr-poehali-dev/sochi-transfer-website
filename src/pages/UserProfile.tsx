@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
@@ -30,16 +31,33 @@ interface Order {
   car_class: string;
 }
 
+interface Transaction {
+  id: number;
+  amount: number;
+  type: string;
+  description: string;
+  status: string;
+  created_at: string;
+}
+
 const UserProfile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [reviewOrderId, setReviewOrderId] = useState<number | null>(null);
   const [reviewDriverId, setReviewDriverId] = useState<number | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawRequisites, setWithdrawRequisites] = useState('');
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositMethod, setDepositMethod] = useState('');
+  const [depositOpen, setDepositOpen] = useState(false);
 
   const userId = localStorage.getItem('user_id');
   const userName = localStorage.getItem('user_name') || 'Пользователь';
@@ -47,6 +65,7 @@ const UserProfile = () => {
   useEffect(() => {
     if (!userId) { navigate('/auth'); return; }
     loadOrders();
+    loadBalance();
   }, [userId]);
 
   const loadOrders = async () => {
@@ -59,6 +78,19 @@ const UserProfile = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadBalance = async () => {
+    try {
+      const r = await fetch(`${API_URLS.users}&action=profile&user_id=${userId}`);
+      const data = await r.json();
+      setBalance(Number(data.user?.balance || 0));
+    } catch (e) { console.error(e); }
+    try {
+      const r2 = await fetch(`${API_URLS.balance}&action=transactions&user_id=${userId}`);
+      const data2 = await r2.json();
+      setTransactions(data2.transactions || []);
+    } catch (e) { console.error(e); }
   };
 
   const handleLogout = () => {
@@ -83,7 +115,6 @@ const UserProfile = () => {
           rating: reviewRating,
           text: reviewText,
           type: 'driver',
-          source: 'site'
         })
       });
       toast({ title: 'Отзыв отправлен', description: 'Отзыв проходит модерацию' });
@@ -97,12 +128,48 @@ const UserProfile = () => {
     }
   };
 
+  const submitWithdraw = async () => {
+    if (!withdrawAmount || !withdrawRequisites) {
+      toast({ title: 'Заполните все поля', variant: 'destructive' }); return;
+    }
+    try {
+      const r = await fetch(API_URLS.balance, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'withdraw', amount: parseFloat(withdrawAmount), requisites: withdrawRequisites, user_id: userId })
+      });
+      const data = await r.json();
+      if (data.error) { toast({ title: data.error, variant: 'destructive' }); return; }
+      toast({ title: 'Заявка на вывод создана', description: 'Ожидайте подтверждения администратора' });
+      setWithdrawOpen(false);
+      setWithdrawAmount('');
+      setWithdrawRequisites('');
+    } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
+  };
+
+  const submitDeposit = async () => {
+    if (!depositAmount) { toast({ title: 'Укажите сумму', variant: 'destructive' }); return; }
+    try {
+      const r = await fetch(API_URLS.balance, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deposit', amount: parseFloat(depositAmount), payment_method: depositMethod, user_id: userId })
+      });
+      const data = await r.json();
+      if (data.error) { toast({ title: data.error, variant: 'destructive' }); return; }
+      toast({ title: 'Заявка на пополнение создана', description: 'Ожидайте подтверждения администратора' });
+      setDepositOpen(false);
+      setDepositAmount('');
+    } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
+  };
+
   const getStatusBg = (color: string) => {
     const map: Record<string, string> = {
       '#10B981': 'bg-green-100 text-green-800',
       '#F59E0B': 'bg-yellow-100 text-yellow-800',
       '#EF4444': 'bg-red-100 text-red-800',
       '#8B5CF6': 'bg-purple-100 text-purple-800',
+      '#F97316': 'bg-orange-100 text-orange-800',
       '#6B7280': 'bg-gray-100 text-gray-800',
     };
     return map[color] || 'bg-blue-100 text-blue-800';
@@ -139,8 +206,9 @@ const UserProfile = () => {
         </div>
 
         <Tabs defaultValue="orders">
-          <TabsList className="mb-6">
+          <TabsList className="mb-6 flex-wrap h-auto gap-1">
             <TabsTrigger value="orders">Мои заказы</TabsTrigger>
+            <TabsTrigger value="balance">Баланс</TabsTrigger>
             <TabsTrigger value="profile">Профиль</TabsTrigger>
           </TabsList>
 
@@ -205,7 +273,7 @@ const UserProfile = () => {
                             )}
                           </div>
                           {order.driver_phone && (
-                            <a href={`tel:${order.driver_phone}`} className="text-primary text-sm mt-1 flex items-center gap-1">
+                            <a href={`tel:${order.driver_phone}`} className="text-primary text-sm mt-2 flex items-center gap-1">
                               <Icon name="Phone" className="h-3 w-3" />
                               {order.driver_phone}
                             </a>
@@ -217,14 +285,14 @@ const UserProfile = () => {
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button size="sm" variant="outline" className="w-full"
-                              onClick={() => { setReviewOrderId(order.id); }}>
+                              onClick={() => { setReviewOrderId(order.id); setReviewDriverId(null); }}>
                               <Icon name="Star" className="mr-2 h-4 w-4" />
                               Оставить отзыв о водителе
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>Отзыв о водителе</DialogTitle>
+                              <DialogTitle>Отзыв о водителе — {order.driver_name}</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4">
                               <div>
@@ -245,6 +313,7 @@ const UserProfile = () => {
                               </div>
                               <Button className="w-full gradient-primary text-white"
                                 onClick={submitReview} disabled={reviewSubmitting}>
+                                {reviewSubmitting ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
                                 Отправить отзыв
                               </Button>
                             </div>
@@ -258,11 +327,105 @@ const UserProfile = () => {
             )}
           </TabsContent>
 
+          <TabsContent value="balance">
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Баланс счёта</p>
+                      <p className="text-4xl font-bold text-gradient">{balance.toFixed(2)} ₽</p>
+                    </div>
+                    <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center">
+                      <Icon name="Wallet" className="h-7 w-7 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="flex-1 gradient-primary text-white">
+                          <Icon name="Plus" className="mr-2 h-4 w-4" />Пополнить
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>Пополнение баланса</DialogTitle></DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label>Сумма (₽)</Label>
+                            <Input type="number" placeholder="1000" value={depositAmount}
+                              onChange={e => setDepositAmount(e.target.value)} />
+                          </div>
+                          <div>
+                            <Label>Способ оплаты</Label>
+                            <select className="w-full border rounded p-2 mt-1 text-sm bg-background"
+                              value={depositMethod} onChange={e => setDepositMethod(e.target.value)}>
+                              <option value="">Выберите способ</option>
+                              <option value="card">Банковская карта</option>
+                              <option value="sbp">СБП</option>
+                              <option value="cash">Наличные</option>
+                            </select>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Администратор свяжется с вами для подтверждения платежа.</p>
+                          <Button className="w-full gradient-primary text-white" onClick={submitDeposit}>Отправить заявку</Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="flex-1" variant="outline">
+                          <Icon name="ArrowUpRight" className="mr-2 h-4 w-4" />Вывести
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>Вывод средств</DialogTitle></DialogHeader>
+                        <div className="space-y-4">
+                          <p className="text-sm text-muted-foreground">Доступно: <strong>{balance.toFixed(2)} ₽</strong></p>
+                          <div>
+                            <Label>Сумма (₽)</Label>
+                            <Input type="number" placeholder="1000" value={withdrawAmount}
+                              onChange={e => setWithdrawAmount(e.target.value)} />
+                          </div>
+                          <div>
+                            <Label>Реквизиты (номер карты / телефон СБП)</Label>
+                            <Textarea placeholder="Номер карты или СБП..." value={withdrawRequisites}
+                              onChange={e => setWithdrawRequisites(e.target.value)} rows={3} />
+                          </div>
+                          <Button className="w-full gradient-primary text-white" onClick={submitWithdraw}>Вывести</Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>История операций</CardTitle></CardHeader>
+                <CardContent>
+                  {transactions.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-6">Операций пока нет</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {transactions.map(t => (
+                        <div key={t.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div>
+                            <p className="text-sm font-medium">{t.description}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString('ru')}</p>
+                          </div>
+                          <div className={`font-semibold ${Number(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {Number(t.amount) >= 0 ? '+' : ''}{Number(t.amount).toFixed(2)} ₽
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="profile">
             <Card>
-              <CardHeader>
-                <CardTitle>Мои данные</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Мои данные</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-xl">
                   <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center text-white text-xl font-bold">
@@ -274,16 +437,13 @@ const UserProfile = () => {
                   </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
-                  <Icon name="Home" className="mr-2 h-4 w-4" />
-                  На главную
+                  <Icon name="Home" className="mr-2 h-4 w-4" />На главную
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => navigate('/driver/register')}>
-                  <Icon name="Car" className="mr-2 h-4 w-4" />
-                  Стать водителем
+                  <Icon name="Car" className="mr-2 h-4 w-4" />Стать водителем
                 </Button>
                 <Button variant="destructive" className="w-full" onClick={handleLogout}>
-                  <Icon name="LogOut" className="mr-2 h-4 w-4" />
-                  Выйти из аккаунта
+                  <Icon name="LogOut" className="mr-2 h-4 w-4" />Выйти из аккаунта
                 </Button>
               </CardContent>
             </Card>

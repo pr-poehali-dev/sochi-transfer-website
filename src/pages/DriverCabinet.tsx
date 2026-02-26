@@ -6,6 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { API_URLS } from '@/config/api';
@@ -46,15 +49,38 @@ interface DriverProfile {
   car_number: string;
 }
 
+interface Review {
+  id: number;
+  author_name: string;
+  rating: number;
+  text: string;
+  created_at: string;
+  admin_reply?: string;
+}
+
+interface Transaction {
+  id: number;
+  amount: number;
+  type: string;
+  description: string;
+  status: string;
+  created_at: string;
+}
+
 const DriverCabinet = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [driver, setDriver] = useState<DriverProfile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
+  const [driverReviews, setDriverReviews] = useState<Review[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isOnline, setIsOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [acceptingId, setAcceptingId] = useState<number | null>(null);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawRequisites, setWithdrawRequisites] = useState('');
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   const driverId = localStorage.getItem('driver_id');
   const driverName = localStorage.getItem('driver_name') || 'Водитель';
@@ -84,6 +110,8 @@ const DriverCabinet = () => {
       if (profileData.driver?.is_active) {
         await loadAvailableOrders();
       }
+      loadReviews();
+      loadTransactions();
     } catch {
       toast({ title: 'Ошибка загрузки', variant: 'destructive' });
     } finally {
@@ -95,6 +123,22 @@ const DriverCabinet = () => {
     const r = await fetch(`${API_URLS.drivers}&action=available_orders`);
     const data = await r.json();
     setAvailableOrders(data.orders || []);
+  };
+
+  const loadReviews = async () => {
+    try {
+      const r = await fetch(`${API_URLS.reviews}&action=driver&driver_id=${driverId}`);
+      const data = await r.json();
+      setDriverReviews(data.reviews || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadTransactions = async () => {
+    try {
+      const r = await fetch(`${API_URLS.balance}&action=transactions&driver_id=${driverId}`);
+      const data = await r.json();
+      setTransactions(data.transactions || []);
+    } catch (e) { console.error(e); }
   };
 
   const toggleOnline = async (value: boolean) => {
@@ -123,6 +167,25 @@ const DriverCabinet = () => {
     } finally {
       setAcceptingId(null);
     }
+  };
+
+  const submitWithdraw = async () => {
+    if (!withdrawAmount || !withdrawRequisites) {
+      toast({ title: 'Заполните все поля', variant: 'destructive' }); return;
+    }
+    try {
+      const r = await fetch(API_URLS.balance, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'withdraw', amount: parseFloat(withdrawAmount), requisites: withdrawRequisites, driver_id: driverId })
+      });
+      const data = await r.json();
+      if (data.error) { toast({ title: data.error, variant: 'destructive' }); return; }
+      toast({ title: 'Заявка на вывод создана', description: 'Ожидайте подтверждения' });
+      setWithdrawOpen(false);
+      setWithdrawAmount('');
+      setWithdrawRequisites('');
+    } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
   };
 
   const handleLogout = () => {
@@ -223,20 +286,27 @@ const DriverCabinet = () => {
         </div>
 
         <Tabs defaultValue={driver?.is_active ? 'available' : 'profile'}>
-          <TabsList className="mb-6">
-            {driver?.is_active && (
-              <>
-                <TabsTrigger value="available">
-                  Доступные
-                  {availableOrders.length > 0 && (
-                    <Badge className="ml-2 bg-red-500 text-white text-xs h-5 px-1.5">{availableOrders.length}</Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="my_orders">Мои заказы</TabsTrigger>
-              </>
-            )}
-            <TabsTrigger value="profile">Профиль</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto mb-6">
+            <TabsList className="inline-flex min-w-max">
+              {driver?.is_active && (
+                <>
+                  <TabsTrigger value="available">
+                    Доступные
+                    {availableOrders.length > 0 && (
+                      <Badge className="ml-2 bg-red-500 text-white text-xs h-5 px-1.5">{availableOrders.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="my_orders">Мои заказы</TabsTrigger>
+                </>
+              )}
+              <TabsTrigger value="balance">Баланс</TabsTrigger>
+              <TabsTrigger value="reviews_tab">
+                Отзывы
+                {driverReviews.length > 0 && <Badge className="ml-2 bg-yellow-500 text-white text-xs h-5 px-1.5">{driverReviews.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="profile">Профиль</TabsTrigger>
+            </TabsList>
+          </div>
 
           {driver?.is_active && (
             <TabsContent value="available">
@@ -280,11 +350,9 @@ const DriverCabinet = () => {
                         )}
                         <Button className="w-full gradient-primary text-white" onClick={() => acceptOrder(order.id)}
                           disabled={acceptingId === order.id}>
-                          {acceptingId === order.id ? (
-                            <Icon name="Loader2" className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Icon name="CheckCircle2" className="mr-2 h-4 w-4" />
-                          )}
+                          {acceptingId === order.id
+                            ? <Icon name="Loader2" className="mr-2 h-4 w-4 animate-spin" />
+                            : <Icon name="CheckCircle2" className="mr-2 h-4 w-4" />}
                           Принять заказ
                         </Button>
                       </CardContent>
@@ -314,7 +382,10 @@ const DriverCabinet = () => {
                             <p className="font-medium">Заказ #{order.id}</p>
                             <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString('ru')}</p>
                           </div>
-                          <span className="text-sm font-bold text-green-600">+{Number(order.driver_amount || 0).toFixed(0)} ₽</span>
+                          <div className="text-right">
+                            <span className="text-sm font-bold text-green-600">+{Number(order.driver_amount || 0).toFixed(0)} ₽</span>
+                            <p className="text-xs text-muted-foreground">из {order.price} ₽</p>
+                          </div>
                         </div>
                         <p className="text-sm">{order.from_location} → {order.to_location}</p>
                         <div className="flex items-center justify-between mt-2">
@@ -328,6 +399,105 @@ const DriverCabinet = () => {
               )}
             </TabsContent>
           )}
+
+          <TabsContent value="balance">
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Баланс</p>
+                      <p className="text-4xl font-bold text-gradient">{Number(driver?.balance || 0).toFixed(2)} ₽</p>
+                    </div>
+                    <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center">
+                      <Icon name="Wallet" className="h-7 w-7 text-white" />
+                    </div>
+                  </div>
+                  <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full gradient-primary text-white">
+                        <Icon name="ArrowUpRight" className="mr-2 h-4 w-4" />Вывести средства
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle>Вывод средств</DialogTitle></DialogHeader>
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">Доступно: <strong>{Number(driver?.balance || 0).toFixed(2)} ₽</strong></p>
+                        <div>
+                          <Label>Сумма (₽)</Label>
+                          <Input type="number" placeholder="1000" value={withdrawAmount}
+                            onChange={e => setWithdrawAmount(e.target.value)} />
+                        </div>
+                        <div>
+                          <Label>Реквизиты (карта / СБП)</Label>
+                          <Textarea placeholder="Номер карты или телефон для СБП..."
+                            value={withdrawRequisites} onChange={e => setWithdrawRequisites(e.target.value)} rows={3} />
+                        </div>
+                        <Button className="w-full gradient-primary text-white" onClick={submitWithdraw}>Отправить заявку</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>История операций</CardTitle></CardHeader>
+                <CardContent>
+                  {transactions.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-6">Операций пока нет</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {transactions.map(t => (
+                        <div key={t.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div>
+                            <p className="text-sm font-medium">{t.description}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleDateString('ru')}</p>
+                          </div>
+                          <div className={`font-semibold ${Number(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {Number(t.amount) >= 0 ? '+' : ''}{Number(t.amount).toFixed(2)} ₽
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="reviews_tab">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Icon name="Star" className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                  Отзывы о вас ({driverReviews.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {driverReviews.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">Отзывов пока нет</p>
+                ) : (
+                  <div className="space-y-4">
+                    {driverReviews.map(r => (
+                      <div key={r.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-medium">{r.author_name || 'Аноним'}</span>
+                          <span className="text-yellow-500">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+                          <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString('ru')}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{r.text}</p>
+                        {r.admin_reply && (
+                          <div className="mt-2 p-2 bg-muted rounded text-xs">
+                            <span className="font-medium">Ответ:</span> {r.admin_reply}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="profile">
             <div className="space-y-4">
@@ -371,8 +541,7 @@ const DriverCabinet = () => {
                 </CardContent>
               </Card>
               <Button variant="destructive" className="w-full" onClick={handleLogout}>
-                <Icon name="LogOut" className="mr-2 h-4 w-4" />
-                Выйти
+                <Icon name="LogOut" className="mr-2 h-4 w-4" />Выйти
               </Button>
             </div>
           </TabsContent>

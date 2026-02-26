@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import BookingForm from '@/components/BookingForm';
 import { API_URLS } from '@/config/api';
@@ -21,6 +24,10 @@ const Index = () => {
   const [reviews, setReviews] = useState<Record<string, unknown>[]>([]);
   const [news, setNews] = useState<Record<string, unknown>[]>([]);
   const [settings, setSettings] = useState<Record<string, string>>({});
+
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ author_name: '', rating: 5, text: '' });
+  const [reviewSending, setReviewSending] = useState(false);
 
   const isLoggedIn = !!localStorage.getItem('user_id');
   const isDriverLoggedIn = !!localStorage.getItem('driver_id');
@@ -44,8 +51,8 @@ const Index = () => {
       const [tariffsRes, fleetRes, reviewsRes, newsRes, settingsRes] = await Promise.all([
         fetch(`${API_URLS.tariffs}?active=true`),
         fetch(`${API_URLS.fleet}?active=true`),
-        fetch(API_URLS.reviews),
-        fetch(API_URLS.news),
+        fetch(`${API_URLS.reviews}&action=approved`),
+        fetch(`${API_URLS.news}&published=true`),
         fetch(API_URLS.settings)
       ]);
       const td = await tariffsRes.json(); setTariffs(td.tariffs || []);
@@ -56,6 +63,28 @@ const Index = () => {
     } catch { /* silent */ }
   };
 
+  const submitReview = async () => {
+    if (!reviewForm.text.trim()) return;
+    setReviewSending(true);
+    try {
+      const userId = localStorage.getItem('user_id');
+      await fetch(API_URLS.reviews, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...reviewForm,
+          author_name: reviewForm.author_name || localStorage.getItem('user_name') || 'Аноним',
+          user_id: userId ? Number(userId) : null,
+          type: 'service'
+        })
+      });
+      setReviewOpen(false);
+      setReviewForm({ author_name: '', rating: 5, text: '' });
+      alert('Спасибо! Ваш отзыв отправлен на модерацию.');
+    } catch { /* silent */ }
+    finally { setReviewSending(false); }
+  };
+
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
     setMobileMenuOpen(false);
@@ -64,7 +93,11 @@ const Index = () => {
 
   const whatsappUrl = settings['whatsapp_number'] ? `https://wa.me/${settings['whatsapp_number']}` : 'https://wa.me/79000000000';
   const telegramUrl = settings['telegram_username'] ? `https://t.me/${settings['telegram_username']}` : '#';
-  const maxUrl = settings['max_username'] ? `https://vk.me/${settings['max_username']}` : '#';
+  const viberUrl = settings['viber_number'] ? `viber://chat?number=${settings['viber_number']}` : '#';
+  const vkUrl = settings['vk_url'] || '#';
+  const instagramUrl = settings['instagram_url'] || '#';
+  const youtubeUrl = settings['youtube_url'] || '#';
+  const tiktokUrl = settings['tiktok_url'] || '#';
   const phone = settings['company_phone'] || '+7 (900) 000-00-00';
   const email = settings['company_email'] || 'info@poehali.pro';
   const address = settings['company_address'] || 'г. Сочи, Аэропорт';
@@ -444,13 +477,13 @@ const Index = () => {
       </section>
 
       {/* Отзывы */}
-      {reviews.length > 0 && (
-        <section id="отзывы" className="py-16 md:py-20">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-12">
-              <Badge className="mb-4 gradient-primary text-white border-0">Отзывы</Badge>
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">Что говорят клиенты</h2>
-            </div>
+      <section id="отзывы" className="py-16 md:py-20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <Badge className="mb-4 gradient-primary text-white border-0">Отзывы</Badge>
+            <h2 className="text-3xl md:text-5xl font-bold mb-4">Что говорят клиенты</h2>
+          </div>
+          {reviews.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
               {reviews.slice(0, 6).map((r, idx) => (
                 <Card key={String(r.id)} className="hover:shadow-lg transition-all animate-fade-in" style={{ animationDelay: `${idx * 0.1}s` }}>
@@ -462,7 +495,7 @@ const Index = () => {
                         </div>
                         <div>
                           <p className="font-medium text-sm">{String(r.author_name || 'Аноним')}</p>
-                          {r.source === 'yandex' && <p className="text-xs text-muted-foreground">Яндекс.Карты</p>}
+                          {r.source && r.source !== 'site' && <p className="text-xs text-muted-foreground">{String(r.source)}</p>}
                         </div>
                       </div>
                       <div className="text-yellow-400 text-sm">{'★'.repeat(Number(r.rating))}{'☆'.repeat(5 - Number(r.rating))}</div>
@@ -472,17 +505,52 @@ const Index = () => {
                 </Card>
               ))}
             </div>
-            {isLoggedIn && (
-              <div className="text-center mt-8">
-                <Button variant="outline" onClick={() => navigate('/profile')}>
-                  <Icon name="Star" className="mr-2 h-4 w-4" />
+          ) : (
+            <p className="text-center text-muted-foreground">Будьте первым, кто оставит отзыв!</p>
+          )}
+          <div className="text-center mt-8">
+            <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg" className="gradient-primary text-white">
+                  <Icon name="Star" className="mr-2 h-5 w-5" />
                   Оставить отзыв
                 </Button>
-              </div>
-            )}
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Ваш отзыв о сервисе</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Ваше имя</Label>
+                    <Input placeholder="Как вас зовут?" value={reviewForm.author_name}
+                      onChange={e => setReviewForm(f => ({ ...f, author_name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Оценка</Label>
+                    <div className="flex gap-2 mt-2">
+                      {[1,2,3,4,5].map(n => (
+                        <button key={n} onClick={() => setReviewForm(f => ({ ...f, rating: n }))}
+                          className={`text-3xl transition-transform hover:scale-110 ${n <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-300'}`}>
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Ваш отзыв</Label>
+                    <Textarea placeholder="Расскажите о вашем опыте..." rows={4} value={reviewForm.text}
+                      onChange={e => setReviewForm(f => ({ ...f, text: e.target.value }))} />
+                  </div>
+                  <Button className="w-full gradient-primary text-white" onClick={submitReview} disabled={reviewSending}>
+                    {reviewSending ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Отправить отзыв
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">Отзыв появится после проверки модератором</p>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* Новости */}
       {news.length > 0 && (
@@ -545,32 +613,56 @@ const Index = () => {
               {settings['whatsapp_number'] && (
                 <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="lg" className="bg-green-500 hover:bg-green-600 text-white">
-                    <Icon name="MessageCircle" className="mr-2 h-5 w-5" />
-                    WhatsApp
+                    <Icon name="MessageCircle" className="mr-2 h-5 w-5" />WhatsApp
                   </Button>
                 </a>
               )}
               {settings['telegram_username'] && (
                 <a href={telegramUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="lg" className="bg-blue-500 hover:bg-blue-600 text-white">
-                    <Icon name="Send" className="mr-2 h-5 w-5" />
-                    Telegram
+                    <Icon name="Send" className="mr-2 h-5 w-5" />Telegram
                   </Button>
                 </a>
               )}
-              {settings['max_username'] && (
-                <a href={maxUrl} target="_blank" rel="noopener noreferrer">
+              {settings['viber_number'] && (
+                <a href={viberUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" className="bg-purple-500 hover:bg-purple-600 text-white">
+                    <Icon name="Phone" className="mr-2 h-5 w-5" />Viber
+                  </Button>
+                </a>
+              )}
+              {settings['vk_url'] && vkUrl !== '#' && (
+                <a href={vkUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="lg" className="bg-blue-700 hover:bg-blue-800 text-white">
-                    <Icon name="Share2" className="mr-2 h-5 w-5" />
-                    MAX / VK
+                    <Icon name="Share2" className="mr-2 h-5 w-5" />ВКонтакте
+                  </Button>
+                </a>
+              )}
+              {settings['instagram_url'] && instagramUrl !== '#' && (
+                <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" className="bg-pink-500 hover:bg-pink-600 text-white">
+                    <Icon name="Camera" className="mr-2 h-5 w-5" />Instagram
+                  </Button>
+                </a>
+              )}
+              {settings['youtube_url'] && youtubeUrl !== '#' && (
+                <a href={youtubeUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" className="bg-red-500 hover:bg-red-600 text-white">
+                    <Icon name="PlayCircle" className="mr-2 h-5 w-5" />YouTube
+                  </Button>
+                </a>
+              )}
+              {settings['tiktok_url'] && tiktokUrl !== '#' && (
+                <a href={tiktokUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" className="bg-gray-900 hover:bg-black text-white">
+                    <Icon name="Music" className="mr-2 h-5 w-5" />TikTok
                   </Button>
                 </a>
               )}
               {!settings['whatsapp_number'] && !settings['telegram_username'] && (
                 <a href={`tel:${phone.replace(/\D/g, '')}`}>
                   <Button size="lg" className="gradient-primary text-white">
-                    <Icon name="Phone" className="mr-2 h-5 w-5" />
-                    {phone}
+                    <Icon name="Phone" className="mr-2 h-5 w-5" />{phone}
                   </Button>
                 </a>
               )}

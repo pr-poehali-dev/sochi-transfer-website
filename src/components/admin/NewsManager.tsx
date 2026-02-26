@@ -35,7 +35,7 @@ const NewsManager = () => {
   const loadNews = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API_URLS.news}&admin=true`);
+      const r = await fetch(API_URLS.news);
       const data = await r.json();
       setNews(data.news || []);
     } catch { toast({ title: 'Ошибка загрузки', variant: 'destructive' }); }
@@ -66,10 +66,11 @@ const NewsManager = () => {
     if (!form.title || !form.content) { toast({ title: 'Заполните поля', variant: 'destructive' }); return; }
     setSaving(true);
     try {
-      const url = API_URLS.news;
       const method = editing ? 'PUT' : 'POST';
-      const body = editing ? { id: editing.id, ...form } : form;
-      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const body = editing
+        ? { id: editing.id, title: form.title, content: form.content, is_published: form.is_published, image_b64: form.image_base64, image_url: editing.image_url }
+        : { title: form.title, content: form.content, is_published: form.is_published, image_b64: form.image_base64 };
+      const r = await fetch(API_URLS.news, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error();
       toast({ title: editing ? 'Новость обновлена' : 'Новость создана' });
       setOpen(false);
@@ -80,7 +81,11 @@ const NewsManager = () => {
 
   const handleDelete = async (id: number) => {
     if (!confirm('Удалить новость?')) return;
-    await fetch(`${API_URLS.news}&id=${id}`, { method: 'DELETE' });
+    await fetch(API_URLS.news, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
     toast({ title: 'Новость удалена' });
     loadNews();
   };
