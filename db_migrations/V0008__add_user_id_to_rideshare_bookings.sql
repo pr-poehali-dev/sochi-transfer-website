@@ -1,0 +1,1 @@
+ALTER TABLE t_p8223105_sochi_transfer_websi.rideshare_bookings ADD COLUMN IF NOT EXISTS user_id INTEGER;

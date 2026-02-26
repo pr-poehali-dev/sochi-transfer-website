@@ -531,6 +531,21 @@ def handle_balance(method, event, params, data, headers):
             conn.commit(); cur.close(); conn.close()
             return resp(200, {'message': 'Вывод отклонён'})
         elif action == 'approve_deposit':
+            if data.get('_direct'):
+                uid = data.get('user_id')
+                did = data.get('driver_id')
+                amount = float(data.get('amount', 0))
+                note = data.get('note', 'Пополнение администратором')
+                if amount > 0:
+                    if uid:
+                        cur.execute(f"UPDATE {SCHEMA}.users SET balance=balance+%s WHERE id=%s", (amount, int(uid)))
+                        cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (user_id,amount,type,description,status) VALUES (%s,%s,'deposit',%s,'completed')", (int(uid), amount, note))
+                    elif did:
+                        cur.execute(f"UPDATE {SCHEMA}.drivers SET balance=balance+%s WHERE id=%s", (amount, int(did)))
+                        cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (driver_id,amount,type,description,status) VALUES (%s,%s,'deposit',%s,'completed')", (int(did), amount, note))
+                    conn.commit()
+                cur.close(); conn.close()
+                return resp(200, {'message': f'Баланс пополнен на {amount} ₽'})
             dep_id = int(data.get('id'))
             cur.execute(f"SELECT user_id,driver_id,amount FROM {SCHEMA}.deposit_requests WHERE id={dep_id}")
             row = cur.fetchone()

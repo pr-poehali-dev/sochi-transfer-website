@@ -7,7 +7,7 @@ import urllib.request
 CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Authorization'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Authorization, X-User-Id, X-Driver-Id, X-Auth-Token, X-Session-Id'
 }
 SCHEMA = 't_p8223105_sochi_transfer_websi'
 
@@ -86,19 +86,35 @@ def handle_orders(method, event):
     elif method == 'POST':
         data = json.loads(event.get('body', '{}'))
         headers = event.get('headers', {}) or {}
-        user_id = headers.get('X-User-Id') or data.get('user_id')
+        user_id = (headers.get('X-User-Id') or headers.get('x-user-id') or
+                   data.get('user_id'))
 
-        # Проверяем авторизацию — заказ только для зарегистрированных
         if not user_id:
             cur.close(); conn.close()
             return resp(401, {'error': 'Для оформления заказа необходимо войти в аккаунт'})
 
-        prepay_amount = round((data.get('price', 0) or 0) * 0.3) if data.get('payment_type') == 'prepay' else 0
-        payment_from_balance = data.get('payment_from_balance', False)
+        if not data.get('from_location') or not data.get('to_location'):
+            cur.close(); conn.close()
+            return resp(400, {'error': 'Укажите откуда и куда'})
+        if not data.get('passenger_name') or not data.get('passenger_phone'):
+            cur.close(); conn.close()
+            return resp(400, {'error': 'Укажите имя и телефон пассажира'})
+        if not data.get('pickup_datetime'):
+            cur.close(); conn.close()
+            return resp(400, {'error': 'Укажите дату и время поездки'})
 
-        # Оплата с баланса
+        tariff_id = data.get('tariff_id')
+        try:
+            tariff_id = int(tariff_id) if tariff_id else None
+        except (ValueError, TypeError):
+            tariff_id = None
+
+        price = float(data.get('price', 0) or 0)
+        prepay_amount = round(price * 0.3) if data.get('payment_type') == 'prepay' else 0
+        payment_from_balance = data.get('payment_from_balance', False)
+        payment_type = data.get('payment_type', 'cash')
+
         if payment_from_balance:
-            price = float(data.get('price', 0))
             if price <= 0:
                 cur.close(); conn.close()
                 return resp(400, {'error': 'Некорректная сумма'})
@@ -107,7 +123,6 @@ def handle_orders(method, event):
             if not bal_row or float(bal_row[0]) < price:
                 cur.close(); conn.close()
                 return resp(400, {'error': 'Недостаточно средств на балансе'})
-            # Списываем сразу
             cur.execute(f"UPDATE {SCHEMA}.users SET balance=balance-%s WHERE id=%s", (price, int(user_id)))
 
         cur.execute(f'''
@@ -120,18 +135,18 @@ def handle_orders(method, event):
         ''', (
             data.get('from_location'), data.get('to_location'), data.get('pickup_datetime'),
             data.get('flight_number'), data.get('passenger_name'), data.get('passenger_phone'),
-            data.get('passenger_email'), data.get('passengers_count', 1), data.get('luggage_count', 0),
-            data.get('tariff_id'), data.get('fleet_id'), data.get('status_id', 1),
-            data.get('price'), data.get('notes'),
+            data.get('passenger_email'), int(data.get('passengers_count', 1) or 1), int(data.get('luggage_count', 0) or 0),
+            tariff_id, data.get('fleet_id'), int(data.get('status_id', 1) or 1),
+            price, data.get('notes'),
             data.get('transfer_type', 'individual'), data.get('car_class', 'comfort'),
-            data.get('payment_type', 'full'), prepay_amount,
+            payment_type, prepay_amount,
             int(user_id), payment_from_balance
         ))
         oid = cur.fetchone()[0]
 
         if payment_from_balance:
             cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (user_id,amount,type,description,status) VALUES (%s,%s,'payment','Оплата заказа #%s','completed')",
-                        (int(user_id), -float(data.get('price',0)), oid))
+                        (int(user_id), -price, oid))
 
         conn.commit(); cur.close(); conn.close()
 
@@ -173,6 +188,26 @@ def handle_rideshares(method, event):
             conn.commit(); cur.close(); conn.close()
             return resp(200, {'cancelled': bool(row), 'message': 'Запись отменена' if row else 'Токен не найден'})
 
+        action = params.get('action')
+        if action == 'my_bookings':
+            user_id = params.get('user_id')
+            if not user_id:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'user_id обязателен'})
+            cur.execute(f'''
+                SELECT rb.id, rb.rideshare_id, rb.passenger_name, rb.passenger_phone,
+                       rb.seats_count, rb.status, rb.cancel_token, rb.created_at,
+                       rs.route_from, rs.route_to, rs.departure_datetime, rs.price_per_seat
+                FROM {SCHEMA}.rideshare_bookings rb
+                LEFT JOIN {SCHEMA}.rideshares rs ON rb.rideshare_id = rs.id
+                WHERE rb.user_id = {int(user_id)}
+                ORDER BY rb.created_at DESC
+            ''')
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'bookings': rows})
+
         ride_id = params.get('id')
         if ride_id:
             cur.execute(f'''
@@ -207,10 +242,11 @@ def handle_rideshares(method, event):
             if row[0] < seats:
                 cur.close(); conn.close(); return resp(400, {'error': 'Недостаточно мест'})
             token = secrets.token_urlsafe(16)
+            booking_user_id = int(data.get('user_id')) if data.get('user_id') else None
             cur.execute(f'''
-                INSERT INTO {SCHEMA}.rideshare_bookings (rideshare_id, passenger_name, passenger_phone, passenger_email, seats_count, status, cancel_token)
-                VALUES (%s,%s,%s,%s,%s,'confirmed',%s) RETURNING id
-            ''', (rid, data.get('passenger_name'), data.get('passenger_phone'), data.get('passenger_email',''), seats, token))
+                INSERT INTO {SCHEMA}.rideshare_bookings (rideshare_id, passenger_name, passenger_phone, passenger_email, seats_count, status, cancel_token, user_id)
+                VALUES (%s,%s,%s,%s,%s,'confirmed',%s,%s) RETURNING id
+            ''', (rid, data.get('passenger_name'), data.get('passenger_phone'), data.get('passenger_email',''), seats, token, booking_user_id))
             bid = cur.fetchone()[0]
             cur.execute(f"UPDATE {SCHEMA}.rideshares SET seats_available=seats_available-{seats}, updated_at=CURRENT_TIMESTAMP WHERE id={rid}")
             conn.commit(); cur.close(); conn.close()

@@ -28,6 +28,10 @@ const UsersManager = () => {
   const [search, setSearch] = useState('');
   const [editDialog, setEditDialog] = useState(false);
   const [createDialog, setCreateDialog] = useState(false);
+  const [balanceDialog, setBalanceDialog] = useState(false);
+  const [balanceUser, setBalanceUser] = useState<User | null>(null);
+  const [balanceAmount, setBalanceAmount] = useState('');
+  const [balanceNote, setBalanceNote] = useState('');
   const [editing, setEditing] = useState<User | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -87,6 +91,44 @@ const UsersManager = () => {
       loadUsers();
     } else {
       toast({ title: d.error || 'Ошибка', variant: 'destructive' });
+    }
+    setSaving(false);
+  };
+
+  const openBalance = (user: User) => {
+    setBalanceUser(user);
+    setBalanceAmount('');
+    setBalanceNote('');
+    setBalanceDialog(true);
+  };
+
+  const addBalance = async () => {
+    const amount = parseFloat(balanceAmount);
+    if (!amount || amount <= 0) { toast({ title: 'Введите сумму', variant: 'destructive' }); return; }
+    setSaving(true);
+    try {
+      const r = await fetch(API_URLS.balance, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'approve_deposit',
+          id: 0,
+          _direct: true,
+          user_id: balanceUser!.id,
+          amount,
+          note: balanceNote || 'Пополнение администратором'
+        })
+      });
+      if (r.ok) {
+        toast({ title: `Баланс пополнен на ${amount} ₽` });
+        setBalanceDialog(false);
+        loadUsers();
+      } else {
+        const d = await r.json();
+        toast({ title: d.error || 'Ошибка', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Ошибка', variant: 'destructive' });
     }
     setSaving(false);
   };
@@ -163,6 +205,9 @@ const UsersManager = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" title="Пополнить баланс" onClick={() => openBalance(user)} className="text-green-600 hover:text-green-700">
+                          <Icon name="PlusCircle" className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(user)}>
                           <Icon name="Pencil" className="h-4 w-4" />
                         </Button>
@@ -245,6 +290,45 @@ const UsersManager = () => {
               <Button className="flex-1 gradient-primary text-white" onClick={createUser} disabled={saving}>
                 {saving && <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />}
                 Создать
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Balance Dialog */}
+      <Dialog open={balanceDialog} onOpenChange={setBalanceDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Пополнить баланс</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Пользователь: <strong>{balanceUser?.name}</strong><br/>
+              Текущий баланс: <strong>{parseFloat(String(balanceUser?.balance || 0)).toFixed(0)} ₽</strong>
+            </p>
+            <div>
+              <Label>Сумма пополнения (₽) <span className="text-red-500">*</span></Label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="1000"
+                value={balanceAmount}
+                onChange={e => setBalanceAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Комментарий</Label>
+              <Input
+                placeholder="Причина пополнения..."
+                value={balanceNote}
+                onChange={e => setBalanceNote(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setBalanceDialog(false)}>Отмена</Button>
+              <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={addBalance} disabled={saving}>
+                {saving && <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />}
+                Пополнить
               </Button>
             </div>
           </div>

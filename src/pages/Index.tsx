@@ -98,6 +98,7 @@ const Index = () => {
   const instagramUrl = settings['instagram_url'] || '#';
   const youtubeUrl = settings['youtube_url'] || '#';
   const tiktokUrl = settings['tiktok_url'] || '#';
+  const maxUrl = settings['max_username'] ? (settings['max_username'].startsWith('http') ? settings['max_username'] : `https://max.ru/${settings['max_username']}`) : '#';
   const phone = settings['company_phone'] || '+7 (900) 000-00-00';
   const email = settings['company_email'] || 'info@poehali.pro';
   const address = settings['company_address'] || 'г. Сочи, Аэропорт';
@@ -153,6 +154,16 @@ const Index = () => {
                 <Icon name="Users" className="h-3.5 w-3.5" />
                 Попутчики
               </button>
+              <button onClick={() => navigate('/news')}
+                className="text-sm font-medium transition-all hover:text-primary text-foreground/70 flex items-center gap-1">
+                <Icon name="Newspaper" className="h-3.5 w-3.5" />
+                Новости
+              </button>
+              <button onClick={() => navigate('/passenger')}
+                className="text-sm font-medium transition-all hover:text-primary text-foreground/70 flex items-center gap-1">
+                <Icon name="UserCircle" className="h-3.5 w-3.5" />
+                Попутчики
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -200,6 +211,11 @@ const Index = () => {
                 className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2">
                 <Icon name="Users" className="h-4 w-4" />
                 Попутчики
+              </button>
+              <button onClick={() => { navigate('/passenger'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2">
+                <Icon name="UserCircle" className="h-4 w-4" />
+                Кабинет попутчика
               </button>
               <div className="pt-2 border-t flex flex-col gap-2">
                 {isLoggedIn ? (
@@ -628,6 +644,13 @@ const Index = () => {
                 <a href={viberUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="lg" className="bg-purple-500 hover:bg-purple-600 text-white">
                     <Icon name="Phone" className="mr-2 h-5 w-5" />Viber
+                  </Button>
+                </a>
+              )}
+              {settings['max_username'] && maxUrl !== '#' && (
+                <a href={maxUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Icon name="Zap" className="mr-2 h-5 w-5" />MAX
                   </Button>
                 </a>
               )}

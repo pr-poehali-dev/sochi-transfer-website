@@ -14,6 +14,7 @@ import DriverLogin from "./pages/DriverLogin";
 import DriverCabinet from "./pages/DriverCabinet";
 import NotFound from "./pages/NotFound";
 import NewsPage from "./pages/NewsPage";
+import PassengerCabinet from "./pages/PassengerCabinet";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/driver/login" element={<DriverLogin />} />
           <Route path="/driver/cabinet" element={<DriverCabinet />} />
           <Route path="/news" element={<NewsPage />} />
+          <Route path="/passenger" element={<PassengerCabinet />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="*" element={<NotFound />} />

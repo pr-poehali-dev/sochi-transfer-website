@@ -161,7 +161,15 @@ const DriverRegister = () => {
                   <Input type="password" placeholder="Повторите пароль" value={form.password2} onChange={e => setField('password2', e.target.value)} required />
                 </div>
               </div>
-              <Button className="w-full gradient-primary text-white" onClick={() => setStep(2)}
+              <Button className="w-full gradient-primary text-white" onClick={() => {
+                  if (form.password !== form.password2) {
+                    toast({ title: 'Пароли не совпадают', variant: 'destructive' }); return;
+                  }
+                  if (form.password.length < 6) {
+                    toast({ title: 'Пароль минимум 6 символов', variant: 'destructive' }); return;
+                  }
+                  setStep(2);
+                }}
                 disabled={!form.name || !form.phone || !form.password || !form.password2}>
                 Далее
                 <Icon name="ArrowRight" className="ml-2 h-4 w-4" />

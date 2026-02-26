@@ -70,7 +70,7 @@ const BookingForm = () => {
     price: 0,
     transfer_type: 'individual',
     car_class: 'comfort',
-    payment_type: 'full',
+    payment_type: 'cash',
     payment_from_balance: false,
   });
   const { toast } = useToast();
@@ -213,7 +213,7 @@ const BookingForm = () => {
           price: 0,
           transfer_type: 'individual',
           car_class: 'comfort',
-          payment_type: 'full',
+          payment_type: 'cash',
           payment_from_balance: false,
         });
         setBasePrice(0);
@@ -424,14 +424,24 @@ const BookingForm = () => {
                 </div>
                 <div className="border-t pt-3 space-y-2">
                   <p className="text-sm font-semibold mb-2">Способ оплаты</p>
-                  <div className={`grid gap-2 ${canPayByBalance ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  <div className={`grid gap-2 ${canPayByBalance ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, payment_type: 'cash', payment_from_balance: false }))}
+                      className={`p-3 rounded-xl border-2 transition-all text-center ${formData.payment_type === 'cash' && !formData.payment_from_balance ? 'border-primary bg-primary/10' : 'border-border bg-white/50'}`}
+                    >
+                      <p className="font-semibold text-sm">Наличные</p>
+                      <p className="text-lg font-bold">{formData.price} ₽</p>
+                      <p className="text-xs text-muted-foreground">при посадке</p>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, payment_type: 'full', payment_from_balance: false }))}
                       className={`p-3 rounded-xl border-2 transition-all text-center ${formData.payment_type === 'full' && !formData.payment_from_balance ? 'border-primary bg-primary/10' : 'border-border bg-white/50'}`}
                     >
-                      <p className="font-semibold text-sm">Полная оплата</p>
+                      <p className="font-semibold text-sm">Онлайн</p>
                       <p className="text-lg font-bold">{formData.price} ₽</p>
+                      <p className="text-xs text-muted-foreground">картой</p>
                     </button>
                     <button
                       type="button"
