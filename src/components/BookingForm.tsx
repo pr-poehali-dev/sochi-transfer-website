@@ -199,6 +199,11 @@ const BookingForm = () => {
         if (formData.payment_from_balance) {
           setUserBalance(prev => prev - formData.price);
         }
+        // Редирект на оплату если провайдер вернул ссылку
+        if (data.payment_url) {
+          window.location.href = data.payment_url;
+          return;
+        }
         setIsSuccessDialogOpen(true);
         setFormData({
           from_location: 'Аэропорт Сочи',

@@ -3,6 +3,10 @@ import os
 import psycopg2
 import secrets
 import urllib.request
+import hashlib
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -18,6 +22,16 @@ def resp(status, body):
     return {'statusCode': status, 'headers': {'Content-Type': 'application/json', **CORS},
             'body': json.dumps(body, default=str), 'isBase64Encoded': False}
 
+def get_site_settings():
+    try:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"SELECT key, value FROM {SCHEMA}.site_settings")
+        s = {r[0]: r[1] for r in cur.fetchall()}
+        cur.close(); conn.close()
+        return s
+    except Exception:
+        return {}
+
 def send_telegram_notification(data: dict, order_id: int):
     token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
@@ -25,7 +39,7 @@ def send_telegram_notification(data: dict, order_id: int):
         return
     transfer_type_labels = {'individual': 'Индивидуальный', 'group': 'Групповой'}
     car_class_labels = {'economy': 'Эконом', 'comfort': 'Комфорт', 'business': 'Бизнес', 'minivan': 'Минивэн'}
-    payment_labels = {'full': 'Полная оплата', 'prepay': 'Предоплата 30%'}
+    payment_labels = {'full': 'Полная оплата', 'prepay': 'Предоплата 30%', 'cash': 'Наличные'}
     text = (
         f"🚗 *Новая заявка #{order_id}*\n\n"
         f"📍 {data.get('from_location')} → {data.get('to_location')}\n"
@@ -34,7 +48,7 @@ def send_telegram_notification(data: dict, order_id: int):
         f"📞 {data.get('passenger_phone')}\n"
         f"👥 {data.get('passengers_count', 1)} пасс.\n"
         f"🚘 {transfer_type_labels.get(data.get('transfer_type','individual'), 'Индивидуальный')} · {car_class_labels.get(data.get('car_class','comfort'), 'Комфорт')}\n"
-        f"💳 {payment_labels.get(data.get('payment_type','full'), 'Полная оплата')}\n"
+        f"💳 {payment_labels.get(data.get('payment_type','cash'), 'Наличные')}\n"
         f"💰 *{data.get('price', 0)} ₽*"
     )
     payload = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}).encode()
@@ -47,6 +61,110 @@ def send_telegram_notification(data: dict, order_id: int):
         urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass
+
+def send_email_notification(data: dict, order_id: int, settings: dict):
+    smtp_host = settings.get('smtp_host', '')
+    smtp_user = settings.get('smtp_user', '')
+    smtp_from = settings.get('smtp_from') or smtp_user
+    notify_to = settings.get('email_notify_to', '')
+    smtp_password = os.environ.get('SMTP_PASSWORD', '')
+    if not smtp_host or not smtp_user or not smtp_password or not notify_to:
+        return
+    if settings.get('email_notify_new_order', 'true') != 'true':
+        return
+    try:
+        smtp_port = int(settings.get('smtp_port', '587') or '587')
+        transfer_type_labels = {'individual': 'Индивидуальный', 'group': 'Групповой'}
+        car_class_labels = {'economy': 'Эконом', 'comfort': 'Комфорт', 'business': 'Бизнес', 'minivan': 'Минивэн'}
+        payment_labels = {'full': 'Полная оплата', 'prepay': 'Предоплата', 'cash': 'Наличные'}
+        html = f"""
+        <html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #f59e0b; padding: 20px; border-radius: 10px 10px 0 0;">
+            <h2 style="color: white; margin: 0;">🚗 Новая заявка #{order_id}</h2>
+        </div>
+        <div style="background: #fff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 0 0 10px 10px;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 8px; color: #6b7280;">Маршрут:</td><td style="padding: 8px; font-weight: bold;">{data.get('from_location')} → {data.get('to_location')}</td></tr>
+                <tr style="background: #f9fafb;"><td style="padding: 8px; color: #6b7280;">Дата и время:</td><td style="padding: 8px;">{str(data.get('pickup_datetime', '')).replace('T', ' ')}</td></tr>
+                <tr><td style="padding: 8px; color: #6b7280;">Пассажир:</td><td style="padding: 8px;">{data.get('passenger_name')}</td></tr>
+                <tr style="background: #f9fafb;"><td style="padding: 8px; color: #6b7280;">Телефон:</td><td style="padding: 8px;">{data.get('passenger_phone')}</td></tr>
+                <tr><td style="padding: 8px; color: #6b7280;">Пассажиров:</td><td style="padding: 8px;">{data.get('passengers_count', 1)}</td></tr>
+                <tr style="background: #f9fafb;"><td style="padding: 8px; color: #6b7280;">Тип трансфера:</td><td style="padding: 8px;">{transfer_type_labels.get(data.get('transfer_type','individual'), 'Индивидуальный')}</td></tr>
+                <tr><td style="padding: 8px; color: #6b7280;">Класс авто:</td><td style="padding: 8px;">{car_class_labels.get(data.get('car_class','comfort'), 'Комфорт')}</td></tr>
+                <tr style="background: #f9fafb;"><td style="padding: 8px; color: #6b7280;">Оплата:</td><td style="padding: 8px;">{payment_labels.get(data.get('payment_type','cash'), 'Наличные')}</td></tr>
+                <tr><td style="padding: 8px; color: #6b7280;">Сумма:</td><td style="padding: 8px; font-weight: bold; font-size: 18px; color: #f59e0b;">{data.get('price', 0)} ₽</td></tr>
+            </table>
+        </div>
+        </body></html>
+        """
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f'Новая заявка #{order_id} — {data.get("from_location")} → {data.get("to_location")}'
+        msg['From'] = f'{smtp_from} <{smtp_user}>'
+        msg['To'] = notify_to
+        msg.attach(MIMEText(html, 'html', 'utf-8'))
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_user, notify_to, msg.as_string())
+    except Exception:
+        pass
+
+def generate_yookassa_payment(order_id: int, amount: float, description: str, return_url: str, settings: dict) -> dict:
+    shop_id = settings.get('yookassa_shop_id', '')
+    secret_key = os.environ.get('YOOKASSA_SECRET_KEY', '')
+    if not shop_id or not secret_key:
+        return {'error': 'ЮКасса не настроена'}
+    try:
+        idempotence_key = secrets.token_urlsafe(16)
+        payload = json.dumps({
+            'amount': {'value': f'{amount:.2f}', 'currency': 'RUB'},
+            'capture': True,
+            'confirmation': {'type': 'redirect', 'return_url': return_url},
+            'description': description,
+            'metadata': {'order_id': order_id},
+        }).encode()
+        import base64
+        credentials = base64.b64encode(f'{shop_id}:{secret_key}'.encode()).decode()
+        req = urllib.request.Request(
+            'https://api.yookassa.ru/v3/payments',
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Basic {credentials}',
+                'Idempotence-Key': idempotence_key,
+            }
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            result = json.loads(response.read())
+            return {
+                'payment_id': result.get('id'),
+                'payment_url': result.get('confirmation', {}).get('confirmation_url'),
+                'status': result.get('status'),
+            }
+    except Exception as e:
+        return {'error': str(e)}
+
+def generate_robokassa_payment(order_id: int, amount: float, description: str, settings: dict) -> dict:
+    login = settings.get('robokassa_login', '')
+    password1 = os.environ.get('ROBOKASSA_PASSWORD1', '')
+    test_mode = settings.get('robokassa_test_mode', 'true') == 'true'
+    if not login or not password1:
+        return {'error': 'Робокасса не настроена'}
+    try:
+        inv_id = order_id
+        out_sum = f'{amount:.2f}'
+        sign_str = f'{login}:{out_sum}:{inv_id}:{password1}'
+        signature = hashlib.md5(sign_str.encode()).hexdigest()
+        test_param = '&IsTest=1' if test_mode else ''
+        desc_enc = urllib.request.quote(description)
+        payment_url = (
+            f'https://auth.robokassa.ru/Merchant/Index.aspx'
+            f'?MerchantLogin={login}&OutSum={out_sum}&InvId={inv_id}'
+            f'&Description={desc_enc}&SignatureValue={signature}{test_param}'
+        )
+        return {'payment_url': payment_url, 'inv_id': inv_id}
+    except Exception as e:
+        return {'error': str(e)}
 
 
 def handle_orders(method, event):
@@ -150,9 +268,26 @@ def handle_orders(method, event):
 
         conn.commit(); cur.close(); conn.close()
 
+        site_settings = get_site_settings()
         send_telegram_notification(data, oid)
+        send_email_notification(data, oid, site_settings)
 
-        return resp(201, {'id': oid, 'message': 'Заявка создана'})
+        # Генерируем ссылку на оплату если выбран онлайн-провайдер
+        payment_info = {}
+        provider = site_settings.get('payment_provider', 'none')
+        if data.get('payment_type') in ('full', 'prepay') and provider != 'none':
+            pay_amount = float(data.get('price', 0))
+            if data.get('payment_type') == 'prepay':
+                prepay_pct = int(site_settings.get('prepay_percent', '30') or 30)
+                pay_amount = round(pay_amount * prepay_pct / 100, 2)
+            description = f'Трансфер {data.get("from_location")} → {data.get("to_location")}'
+            if provider == 'yookassa':
+                return_url = site_settings.get('site_url', 'https://transfer-abkhazia.ru') + '/profile'
+                payment_info = generate_yookassa_payment(oid, pay_amount, description, return_url, site_settings)
+            elif provider == 'robokassa':
+                payment_info = generate_robokassa_payment(oid, pay_amount, description, site_settings)
+
+        return resp(201, {'id': oid, 'message': 'Заявка создана', **payment_info})
 
     elif method == 'PUT':
         data = json.loads(event.get('body', '{}'))
