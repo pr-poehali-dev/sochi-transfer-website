@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { API_URLS } from '@/config/api';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface Order {
   id: number;
@@ -58,6 +59,9 @@ const UserProfile = () => {
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMethod, setDepositMethod] = useState('');
   const [depositOpen, setDepositOpen] = useState(false);
+
+  const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe, isSupported: pushSupported } = usePushNotifications();
+  const [pushLoading, setPushLoading] = useState(false);
 
   const userId = localStorage.getItem('user_id');
   const userName = localStorage.getItem('user_name') || 'Пользователь';
@@ -436,6 +440,35 @@ const UserProfile = () => {
                     <p className="text-sm text-muted-foreground">Пассажир</p>
                   </div>
                 </div>
+                {pushSupported && pushState !== 'unsupported' && (
+                  <div className="p-4 border rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon name="Bell" className="h-4 w-4 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">Push-уведомления</p>
+                          <p className="text-xs text-muted-foreground">Статус заказов на телефон</p>
+                        </div>
+                      </div>
+                      <Badge variant={pushState === 'granted' ? 'default' : pushState === 'denied' ? 'destructive' : 'outline'} className="text-xs">
+                        {pushState === 'granted' ? 'Включены' : pushState === 'denied' ? 'Заблокированы' : 'Выключены'}
+                      </Badge>
+                    </div>
+                    {pushState === 'granted' ? (
+                      <Button variant="outline" size="sm" className="w-full text-xs" onClick={async () => { setPushLoading(true); await pushUnsubscribe(); setPushLoading(false); }} disabled={pushLoading}>
+                        {pushLoading ? <Icon name="Loader2" className="h-3 w-3 animate-spin mr-1" /> : <Icon name="BellOff" className="h-3 w-3 mr-1" />}
+                        Отключить уведомления
+                      </Button>
+                    ) : pushState === 'denied' ? (
+                      <p className="text-xs text-muted-foreground">Разрешите уведомления в настройках браузера</p>
+                    ) : (
+                      <Button size="sm" className="w-full gradient-primary text-white text-xs" onClick={async () => { setPushLoading(true); await pushSubscribe(); setPushLoading(false); }} disabled={pushLoading}>
+                        {pushLoading ? <Icon name="Loader2" className="h-3 w-3 animate-spin mr-1" /> : <Icon name="Bell" className="h-3 w-3 mr-1" />}
+                        Включить уведомления
+                      </Button>
+                    )}
+                  </div>
+                )}
                 <Button variant="outline" className="w-full" onClick={() => navigate('/')}>
                   <Icon name="Home" className="mr-2 h-4 w-4" />На главную
                 </Button>

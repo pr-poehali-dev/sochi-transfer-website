@@ -104,6 +104,29 @@ def handle_users(method, event, params, data, headers):
             conn.commit(); cur.close(); conn.close()
             token = secrets.token_urlsafe(32)
             return resp(201, {'token': token, 'user': {'id': uid, 'phone': phone, 'name': name}})
+        elif action == 'push_subscribe':
+            endpoint = data.get('endpoint', '').strip()
+            p256dh = data.get('p256dh', '').strip()
+            auth_key = data.get('auth', '').strip()
+            uid = data.get('user_id')
+            if not endpoint:
+                return resp(400, {'error': 'endpoint обязателен'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f'''
+                INSERT INTO {SCHEMA}.push_subscriptions (user_id, endpoint, p256dh, auth, updated_at)
+                VALUES (%s,%s,%s,%s,NOW())
+                ON CONFLICT (endpoint) DO UPDATE SET user_id=EXCLUDED.user_id, p256dh=EXCLUDED.p256dh, auth=EXCLUDED.auth, updated_at=NOW()
+            ''', (int(uid) if uid else None, endpoint, p256dh, auth_key))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Подписка сохранена'})
+        elif action == 'push_unsubscribe':
+            endpoint = data.get('endpoint', '').strip()
+            if not endpoint:
+                return resp(400, {'error': 'endpoint обязателен'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"UPDATE {SCHEMA}.push_subscriptions SET user_id=NULL WHERE endpoint=%s", (endpoint,))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Подписка удалена'})
         elif action == 'login':
             phone = data.get('phone', '').strip()
             password = data.get('password', '')

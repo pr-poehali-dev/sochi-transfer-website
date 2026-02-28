@@ -5,6 +5,7 @@ import secrets
 import urllib.request
 import hashlib
 import smtplib
+import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -108,6 +109,32 @@ def send_email_notification(data: dict, order_id: int, settings: dict):
             server.sendmail(smtp_user, notify_to, msg.as_string())
     except Exception:
         pass
+
+def send_push_to_user(user_id: int, title: str, body: str, url: str = '/profile'):
+    """Отправляет Web Push уведомление пользователю через все его подписки"""
+    try:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"SELECT endpoint, p256dh, auth FROM {SCHEMA}.push_subscriptions WHERE user_id=%s", (user_id,))
+        subscriptions = cur.fetchall()
+        cur.close(); conn.close()
+        for endpoint, p256dh, auth_key in subscriptions:
+            try:
+                payload = json.dumps({'title': title, 'body': body, 'url': url, 'tag': 'order-update'}).encode()
+                req = urllib.request.Request(
+                    endpoint,
+                    data=payload,
+                    headers={
+                        'Content-Type': 'application/json',
+                        'TTL': '86400',
+                    },
+                    method='POST'
+                )
+                urllib.request.urlopen(req, timeout=5)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
 
 def generate_yookassa_payment(order_id: int, amount: float, description: str, return_url: str, settings: dict) -> dict:
     shop_id = settings.get('yookassa_shop_id', '')
@@ -291,11 +318,33 @@ def handle_orders(method, event):
 
     elif method == 'PUT':
         data = json.loads(event.get('body', '{}'))
+        order_id = data.get('id')
+        new_status_id = data.get('status_id')
+        # Получаем user_id и текущий статус до обновления
+        user_id_for_push = None
+        status_name_for_push = None
+        if order_id and new_status_id:
+            cur.execute(f"SELECT user_id FROM {SCHEMA}.orders WHERE id=%s", (int(order_id),))
+            row = cur.fetchone()
+            if row:
+                user_id_for_push = row[0]
+            cur.execute(f"SELECT name FROM {SCHEMA}.order_statuses WHERE id=%s", (int(new_status_id),))
+            srow = cur.fetchone()
+            if srow:
+                status_name_for_push = srow[0]
         cur.execute(f'''
             UPDATE {SCHEMA}.orders SET status_id=%s, price=%s, notes=%s, updated_at=CURRENT_TIMESTAMP
             WHERE id=%s
-        ''', (data.get('status_id'), data.get('price'), data.get('notes'), data.get('id')))
+        ''', (new_status_id, data.get('price'), data.get('notes'), order_id))
         conn.commit(); cur.close(); conn.close()
+        # Отправляем push пользователю о смене статуса
+        if user_id_for_push and status_name_for_push:
+            send_push_to_user(
+                user_id_for_push,
+                f'Статус заявки #{order_id} изменён',
+                f'Новый статус: {status_name_for_push}',
+                '/profile'
+            )
         return resp(200, {'message': 'Заявка обновлена'})
 
     elif method == 'DELETE':
