@@ -12,6 +12,8 @@ import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { API_URLS } from '@/config/api';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface Rideshare {
   id: number;
   route_from: string;
@@ -43,61 +45,95 @@ interface Booking {
   price_per_seat?: number;
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const CAR_CLASS_LABELS: Record<string, string> = {
   economy: 'Эконом', comfort: 'Комфорт', business: 'Бизнес', minivan: 'Минивэн',
 };
 
-const formatDate = (dt: string) => {
-  const d = new Date(dt);
-  return d.toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const STORAGE_KEY_ID    = 'passenger_user_id';
+const STORAGE_KEY_NAME  = 'passenger_user_name';
+const STORAGE_KEY_PHONE = 'passenger_user_phone';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const formatDate = (dt: string) =>
+  new Date(dt).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+const formatDateShort = (dt: string) =>
+  new Date(dt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+
+const nowDatetimeLocal = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
 };
 
-const STORAGE_KEY_ID = 'passenger_user_id';
-const STORAGE_KEY_NAME = 'passenger_user_name';
-const STORAGE_KEY_PHONE = 'passenger_user_phone';
+const statusLabel = (s: string) =>
+  s === 'confirmed' ? 'Подтверждено' : s === 'cancelled' ? 'Отменено' : 'Ожидание';
+
+const statusVariant = (s: string): 'default' | 'destructive' | 'secondary' =>
+  s === 'confirmed' ? 'default' : s === 'cancelled' ? 'destructive' : 'secondary';
+
+// ─── RoutePin visual ──────────────────────────────────────────────────────────
+
+const RoutePin = ({ from, to }: { from: string; to: string }) => (
+  <div className="flex items-start gap-2.5">
+    <div className="flex flex-col items-center pt-0.5 flex-shrink-0">
+      <div className="w-2 h-2 rounded-full bg-green-500" />
+      <div className="w-px h-5 bg-muted-foreground/25 my-0.5" />
+      <div className="w-2 h-2 rounded-full bg-red-500" />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium leading-tight truncate">{from}</p>
+      <p className="text-sm text-muted-foreground leading-tight truncate mt-2">{to}</p>
+    </div>
+  </div>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 const PassengerCabinet = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [isAuth, setIsAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authForm, setAuthForm] = useState({ name: '', phone: '', password: '', password2: '' });
+  const [isAuth, setIsAuth]         = useState(false);
+  const [authMode, setAuthMode]     = useState<'login' | 'register'>('login');
+  const [authForm, setAuthForm]     = useState({ name: '', phone: '', password: '', password2: '' });
   const [authLoading, setAuthLoading] = useState(false);
 
-  const [rides, setRides] = useState<Rideshare[]>([]);
+  const [rides, setRides]           = useState<Rideshare[]>([]);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]       = useState(false);
 
   const [createDialog, setCreateDialog] = useState(false);
-  const [bookDialog, setBookDialog] = useState(false);
+  const [bookDialog, setBookDialog]     = useState(false);
   const [selectedRide, setSelectedRide] = useState<Rideshare | null>(null);
 
   const [createForm, setCreateForm] = useState({
     route_from: '', route_to: '', departure_datetime: '',
-    seats_total: '4', price_per_seat: '', car_class: 'comfort', notes: ''
+    seats_total: '4', price_per_seat: '', car_class: 'comfort', notes: '',
   });
   const [bookForm, setBookForm] = useState({ seats_count: '1' });
 
-  const userId = localStorage.getItem(STORAGE_KEY_ID);
-  const userName = localStorage.getItem(STORAGE_KEY_NAME) || '';
+  const userId    = localStorage.getItem(STORAGE_KEY_ID);
+  const userName  = localStorage.getItem(STORAGE_KEY_NAME)  || '';
   const userPhone = localStorage.getItem(STORAGE_KEY_PHONE) || '';
 
   useEffect(() => {
     const uid = localStorage.getItem(STORAGE_KEY_ID);
-    if (uid) {
-      setIsAuth(true);
-      loadData();
-    }
+    if (uid) { setIsAuth(true); loadData(); }
   }, []);
+
+  // ── Data loading ──────────────────────────────────────────────────────────
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API_URLS.rideshares}`);
+      const r = await fetch(API_URLS.rideshares);
       const d = await r.json();
-      setRides((d.rideshares || []).filter((r: Rideshare) => r.status === 'active'));
-    } catch { /* silent */ }
+      setRides((d.rideshares || []).filter((rs: Rideshare) => rs.status === 'active'));
+    } catch (e) { console.error('[PassengerCabinet] loadData rides error:', e); }
 
     const uid = localStorage.getItem(STORAGE_KEY_ID);
     if (uid) {
@@ -105,10 +141,12 @@ const PassengerCabinet = () => {
         const r = await fetch(`${API_URLS.rideshares}&action=my_bookings&user_id=${uid}`);
         const d = await r.json();
         setMyBookings(d.bookings || []);
-      } catch { /* silent */ }
+      } catch (e) { console.error('[PassengerCabinet] loadData bookings error:', e); }
     }
     setLoading(false);
   };
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
 
   const handleAuth = async () => {
     if (!authForm.phone || !authForm.password) {
@@ -116,12 +154,8 @@ const PassengerCabinet = () => {
     }
     if (authMode === 'register') {
       if (!authForm.name) { toast({ title: 'Введите имя', variant: 'destructive' }); return; }
-      if (authForm.password !== authForm.password2) {
-        toast({ title: 'Пароли не совпадают', variant: 'destructive' }); return;
-      }
-      if (authForm.password.length < 6) {
-        toast({ title: 'Пароль минимум 6 символов', variant: 'destructive' }); return;
-      }
+      if (authForm.password.length < 6) { toast({ title: 'Пароль минимум 6 символов', variant: 'destructive' }); return; }
+      if (authForm.password !== authForm.password2) { toast({ title: 'Пароли не совпадают', variant: 'destructive' }); return; }
     }
     setAuthLoading(true);
     try {
@@ -133,13 +167,13 @@ const PassengerCabinet = () => {
           phone: authForm.phone,
           name: authForm.name,
           password: authForm.password,
-        })
+        }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Ошибка');
       const user = data.user;
-      localStorage.setItem(STORAGE_KEY_ID, String(user.id));
-      localStorage.setItem(STORAGE_KEY_NAME, user.name);
+      localStorage.setItem(STORAGE_KEY_ID,    String(user.id));
+      localStorage.setItem(STORAGE_KEY_NAME,  user.name);
       localStorage.setItem(STORAGE_KEY_PHONE, user.phone);
       setIsAuth(true);
       toast({ title: authMode === 'login' ? 'Добро пожаловать!' : 'Аккаунт создан!' });
@@ -159,6 +193,8 @@ const PassengerCabinet = () => {
     setMyBookings([]);
   };
 
+  // ── Ride actions ──────────────────────────────────────────────────────────
+
   const createRide = async () => {
     if (!createForm.route_from || !createForm.route_to || !createForm.departure_datetime) {
       toast({ title: 'Заполните маршрут и дату', variant: 'destructive' }); return;
@@ -173,7 +209,7 @@ const PassengerCabinet = () => {
           price_per_seat: parseFloat(createForm.price_per_seat || '0'),
           created_by_name: userName,
           created_by_phone: userPhone,
-        })
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Ошибка');
@@ -203,12 +239,13 @@ const PassengerCabinet = () => {
           passenger_phone: userPhone,
           seats_count: seats,
           user_id: userId ? parseInt(userId) : undefined,
-        })
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Ошибка');
       toast({ title: 'Место забронировано!' });
       setBookDialog(false);
+      setSelectedRide(null);
       loadData();
     } catch (err: unknown) {
       toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
@@ -220,215 +257,373 @@ const PassengerCabinet = () => {
     try {
       const r = await fetch(`${API_URLS.rideshares}&cancel_token=${cancelToken}`);
       const d = await r.json();
-      toast({ title: d.cancelled ? 'Бронирование отменено' : d.message });
+      toast({ title: d.cancelled ? 'Бронирование отменено' : (d.message || 'Готово') });
       loadData();
     } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
   };
 
+  // ── Auth screen ───────────────────────────────────────────────────────────
+
   if (!isAuth) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
-          <div className="flex items-center gap-2 mb-6 cursor-pointer justify-center" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Icon name="Users" className="h-4 w-4 text-white" />
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 flex flex-col">
+        {/* Mini header */}
+        <header className="h-14 flex items-center px-4 border-b bg-background/80 backdrop-blur-md">
+          <button
+            className="flex items-center gap-2 min-h-[44px]"
+            onClick={() => navigate('/')}
+          >
+            <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
+              <Icon name="Users" className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-bold text-gradient text-lg">Попутчики</span>
-          </div>
+            <span className="font-bold text-gradient">Попутчики</span>
+          </button>
+        </header>
 
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl">{authMode === 'login' ? 'Вход' : 'Регистрация'}</CardTitle>
-              <CardDescription>{authMode === 'login' ? 'Войдите в аккаунт' : 'Создайте новый аккаунт'}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {authMode === 'register' && (
-                <div>
-                  <Label className="text-sm">Ваше имя</Label>
-                  <Input className="mt-1" placeholder="Иван Иванов" value={authForm.name} onChange={e => setAuthForm(f => ({ ...f, name: e.target.value }))} />
-                </div>
-              )}
-              <div>
-                <Label className="text-sm">Телефон</Label>
-                <Input className="mt-1" placeholder="+7 (900) 000-00-00" value={authForm.phone} onChange={e => setAuthForm(f => ({ ...f, phone: e.target.value }))} />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm">
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-3">
+                <Icon name="Users" className="h-7 w-7 text-white" />
               </div>
-              <div>
-                <Label className="text-sm">Пароль</Label>
-                <Input className="mt-1" type="password" placeholder="Минимум 6 символов" value={authForm.password} onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))} />
-              </div>
-              {authMode === 'register' && (
-                <div>
-                  <Label className="text-sm">Повторите пароль</Label>
-                  <Input className="mt-1" type="password" placeholder="Повторите пароль" value={authForm.password2} onChange={e => setAuthForm(f => ({ ...f, password2: e.target.value }))} />
-                </div>
-              )}
-              <Button className="w-full gradient-primary text-white mt-2" onClick={handleAuth} disabled={authLoading}>
-                {authLoading ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
-                {authMode === 'login' ? 'Войти' : 'Создать аккаунт'}
-              </Button>
-              <p className="text-center text-sm text-muted-foreground pt-1">
-                {authMode === 'login' ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
-                <button className="text-primary underline font-medium" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
-                  {authMode === 'login' ? 'Зарегистрироваться' : 'Войти'}
-                </button>
+              <h1 className="text-xl font-bold">
+                {authMode === 'login' ? 'Войти в кабинет' : 'Создать аккаунт'}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {authMode === 'login' ? 'Для доступа к поездкам попутчиков' : 'Присоединитесь к сервису попутчиков'}
               </p>
-              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => navigate('/')}>
-                <Icon name="ArrowLeft" className="h-4 w-4 mr-1" /> На главную
-              </Button>
-            </CardContent>
-          </Card>
+            </div>
+
+            <Card className="border border-border shadow-lg">
+              <CardContent className="p-5 space-y-3">
+                {authMode === 'register' && (
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Ваше имя</Label>
+                    <Input
+                      className="h-11"
+                      placeholder="Иван Иванов"
+                      autoComplete="name"
+                      value={authForm.name}
+                      onChange={e => setAuthForm(f => ({ ...f, name: e.target.value }))}
+                    />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Телефон</Label>
+                  <Input
+                    className="h-11"
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="+7 (900) 000-00-00"
+                    autoComplete="tel"
+                    value={authForm.phone}
+                    onChange={e => setAuthForm(f => ({ ...f, phone: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Пароль</Label>
+                  <Input
+                    className="h-11"
+                    type="password"
+                    placeholder="Минимум 6 символов"
+                    autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                    value={authForm.password}
+                    onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && handleAuth()}
+                  />
+                </div>
+                {authMode === 'register' && (
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Повторите пароль</Label>
+                    <Input
+                      className={`h-11 ${authForm.password2 && authForm.password !== authForm.password2 ? 'border-red-400' : ''}`}
+                      type="password"
+                      placeholder="Повторите пароль"
+                      autoComplete="new-password"
+                      value={authForm.password2}
+                      onChange={e => setAuthForm(f => ({ ...f, password2: e.target.value }))}
+                    />
+                    {authForm.password2 && authForm.password !== authForm.password2 && (
+                      <p className="text-xs text-red-500">Пароли не совпадают</p>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  className="w-full gradient-primary text-white min-h-[48px] text-base font-semibold mt-1"
+                  onClick={handleAuth}
+                  disabled={authLoading}
+                >
+                  {authLoading && <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />}
+                  {authMode === 'login' ? 'Войти' : 'Создать аккаунт'}
+                </Button>
+
+                <div className="text-center text-sm text-muted-foreground pt-1">
+                  {authMode === 'login' ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
+                  <button
+                    className="text-primary font-medium underline-offset-2 hover:underline"
+                    onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                  >
+                    {authMode === 'login' ? 'Зарегистрироваться' : 'Войти'}
+                  </button>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground min-h-[40px]"
+                  onClick={() => navigate('/')}
+                >
+                  <Icon name="ArrowLeft" className="h-4 w-4 mr-1" />
+                  На главную
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
   }
 
+  // ── Authenticated view ────────────────────────────────────────────────────
+
+  const activeBookings   = myBookings.filter(b => b.status !== 'cancelled');
+  const bookSeats        = parseInt(bookForm.seats_count) || 1;
+  const bookTotal        = selectedRide ? selectedRide.price_per_seat * bookSeats : 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-      {/* Шапка */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
+
+      {/* ── Sticky header ── */}
+      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
+        <div className="max-w-2xl mx-auto px-3 h-14 flex items-center justify-between">
+          <button
+            className="flex items-center gap-1.5 min-h-[44px]"
+            onClick={() => navigate('/')}
+          >
+            <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
               <Icon name="Users" className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-bold text-gradient text-sm">Попутчики</span>
-          </div>
+            <span className="font-bold text-gradient hidden xs:inline">Попутчики</span>
+          </button>
+
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:block">{userName}</span>
-            <Button variant="ghost" size="sm" onClick={logout}>
+            {/* User avatar */}
+            <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+              {userName.charAt(0) || '?'}
+            </div>
+            <span className="text-sm text-muted-foreground hidden sm:block truncate max-w-[100px]">
+              {userName}
+            </span>
+            <button
+              onClick={logout}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Выйти"
+            >
               <Icon name="LogOut" className="h-4 w-4" />
-            </Button>
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-4 max-w-2xl">
-        {/* Кнопка предложить поездку */}
-        <Button className="w-full gradient-primary text-white mb-4 h-12 text-base" onClick={() => setCreateDialog(true)}>
-          <Icon name="Plus" className="h-5 w-5 mr-2" />
-          Предложить поездку
-        </Button>
+      {/* ── Page body ── */}
+      <main className="max-w-2xl mx-auto px-3 pt-4 pb-24">
 
         <Tabs defaultValue="find">
-          <TabsList className="w-full mb-4">
-            <TabsTrigger value="find" className="flex-1 text-xs sm:text-sm">Найти поездку</TabsTrigger>
-            <TabsTrigger value="bookings" className="flex-1 text-xs sm:text-sm">
-              Мои брони {myBookings.length > 0 && `(${myBookings.length})`}
-            </TabsTrigger>
-          </TabsList>
+          {/* Horizontally scrollable tab strip */}
+          <div className="overflow-x-auto -mx-3 px-3 mb-4">
+            <TabsList className="inline-flex w-max h-10 bg-muted rounded-xl p-1 gap-0">
+              <TabsTrigger
+                value="find"
+                className="relative text-xs px-4 h-8 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm whitespace-nowrap"
+              >
+                Поездки
+                {rides.length > 0 && (
+                  <span className="ml-1.5 text-[10px] bg-muted-foreground/20 text-foreground px-1.5 rounded-full">
+                    {rides.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="bookings"
+                className="relative text-xs px-4 h-8 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm whitespace-nowrap"
+              >
+                Мои записи
+                {activeBookings.length > 0 && (
+                  <span className="ml-1.5 text-[10px] bg-primary/20 text-primary px-1.5 rounded-full font-semibold">
+                    {activeBookings.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          {/* Найти поездку */}
-          <TabsContent value="find">
+          {/* ══════════════════════════════════════
+              TAB: Find a ride
+          ══════════════════════════════════════ */}
+          <TabsContent value="find" className="mt-0">
             {loading ? (
-              <div className="flex justify-center py-12">
+              <div className="flex justify-center py-16">
                 <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : rides.length === 0 ? (
               <Card>
-                <CardContent className="py-12 text-center">
-                  <Icon name="Car" className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground">Нет доступных поездок</p>
-                  <p className="text-sm text-muted-foreground mt-1">Предложите свою поездку первым!</p>
+                <CardContent className="py-14 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Icon name="Car" className="h-7 w-7 text-muted-foreground" />
+                  </div>
+                  <p className="font-semibold text-muted-foreground">Нет доступных поездок</p>
+                  <p className="text-sm text-muted-foreground mt-1 mb-5">Предложите свою поездку первым!</p>
+                  <Button
+                    className="gradient-primary text-white min-h-[44px]"
+                    onClick={() => setCreateDialog(true)}
+                  >
+                    <Icon name="Plus" className="mr-2 h-4 w-4" />
+                    Предложить поездку
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-3">
-                {rides.map(ride => (
-                  <Card key={ride.id} className="overflow-hidden">
-                    <CardContent className="p-4">
-                      {/* Маршрут */}
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="flex flex-col items-center pt-1">
-                          <div className="w-2 h-2 rounded-full bg-green-500" />
-                          <div className="w-0.5 h-6 bg-muted-foreground/30 my-1" />
-                          <div className="w-2 h-2 rounded-full bg-red-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{ride.route_from}</p>
-                          <p className="text-sm text-muted-foreground truncate mt-2">{ride.route_to}</p>
-                        </div>
-                      </div>
+                {rides.map(ride => {
+                  const isFull = ride.seats_available === 0;
+                  return (
+                    <Card
+                      key={ride.id}
+                      className={`border transition-shadow ${isFull ? 'opacity-70 border-border' : 'border-border hover:shadow-md'}`}
+                    >
+                      <CardContent className="p-4">
+                        {/* Route */}
+                        <RoutePin from={ride.route_from} to={ride.route_to} />
 
-                      {/* Детали */}
-                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
-                        <div className="flex items-center gap-1">
-                          <Icon name="Calendar" className="h-3 w-3" />
-                          <span>{formatDate(ride.departure_datetime)}</span>
+                        {/* Meta chips */}
+                        <div className="flex flex-wrap gap-2 mt-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                            <Icon name="Calendar" className="h-3 w-3" />
+                            {formatDate(ride.departure_datetime)}
+                          </span>
+                          <span className={`flex items-center gap-1 px-2 py-1 rounded-full ${isFull ? 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'}`}>
+                            <Icon name="Users" className="h-3 w-3" />
+                            {isFull ? 'Мест нет' : `${ride.seats_available} мест`}
+                          </span>
+                          <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                            <Icon name="Car" className="h-3 w-3" />
+                            {CAR_CLASS_LABELS[ride.car_class] || ride.car_class}
+                          </span>
+                          {ride.created_by_name && (
+                            <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full truncate max-w-[120px]">
+                              <Icon name="User" className="h-3 w-3 flex-shrink-0" />
+                              {ride.created_by_name}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Icon name="Users" className="h-3 w-3" />
-                          <span>{ride.seats_available} мест</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Icon name="Car" className="h-3 w-3" />
-                          <span>{CAR_CLASS_LABELS[ride.car_class] || ride.car_class}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Icon name="User" className="h-3 w-3" />
-                          <span className="truncate">{ride.created_by_name || 'Водитель'}</span>
-                        </div>
-                      </div>
 
-                      {ride.notes && (
-                        <p className="text-xs text-muted-foreground bg-muted/50 rounded p-2 mb-3">{ride.notes}</p>
-                      )}
+                        {/* Notes */}
+                        {ride.notes && (
+                          <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 mt-3 italic">
+                            {ride.notes}
+                          </p>
+                        )}
 
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-primary text-lg">
-                          {ride.price_per_seat > 0 ? `${ride.price_per_seat} ₽/чел` : 'Договорная'}
-                        </span>
-                        <Button
-                          size="sm"
-                          className="gradient-primary text-white"
-                          disabled={ride.seats_available === 0}
-                          onClick={() => { setSelectedRide(ride); setBookDialog(true); }}
-                        >
-                          {ride.seats_available === 0 ? 'Нет мест' : 'Забронировать'}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                        {/* Price + CTA */}
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                          <div>
+                            <span className="font-bold text-primary text-lg leading-none">
+                              {ride.price_per_seat > 0 ? `${ride.price_per_seat} ₽` : 'Договорная'}
+                            </span>
+                            {ride.price_per_seat > 0 && (
+                              <span className="text-xs text-muted-foreground ml-1">/чел</span>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            className="gradient-primary text-white min-h-[40px] px-5"
+                            disabled={isFull}
+                            onClick={() => { setSelectedRide(ride); setBookForm({ seats_count: '1' }); setBookDialog(true); }}
+                          >
+                            {isFull ? 'Мест нет' : 'Забронировать'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
 
-          {/* Мои бронирования */}
-          <TabsContent value="bookings">
+          {/* ══════════════════════════════════════
+              TAB: My bookings
+          ══════════════════════════════════════ */}
+          <TabsContent value="bookings" className="mt-0">
             {myBookings.length === 0 ? (
               <Card>
-                <CardContent className="py-12 text-center">
-                  <Icon name="Ticket" className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground">У вас нет бронирований</p>
+                <CardContent className="py-14 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Icon name="Ticket" className="h-7 w-7 text-muted-foreground" />
+                  </div>
+                  <p className="font-semibold text-muted-foreground">Бронирований пока нет</p>
+                  <p className="text-sm text-muted-foreground mt-1 mb-5">Найдите поездку и займите место</p>
+                  <Button
+                    variant="outline"
+                    className="min-h-[44px]"
+                    onClick={() => {
+                      const tab = document.querySelector('[data-value="find"]') as HTMLButtonElement;
+                      tab?.click();
+                    }}
+                  >
+                    Найти поездку
+                  </Button>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-3">
                 {myBookings.map(b => (
-                  <Card key={b.id}>
+                  <Card key={b.id} className={b.status === 'cancelled' ? 'opacity-60' : ''}>
                     <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{b.route_from} → {b.route_to}</p>
+                      {/* Route */}
+                      {b.route_from && b.route_to ? (
+                        <RoutePin from={b.route_from} to={b.route_to} />
+                      ) : (
+                        <p className="text-sm font-medium text-muted-foreground">Поездка #{b.rideshare_id}</p>
+                      )}
+
+                      {/* Date + status row */}
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                           {b.departure_datetime && (
-                            <p className="text-xs text-muted-foreground mt-0.5">{formatDate(b.departure_datetime)}</p>
+                            <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                              <Icon name="Calendar" className="h-3 w-3" />
+                              {formatDateShort(b.departure_datetime)}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                            <Icon name="Users" className="h-3 w-3" />
+                            {b.seats_count} мест
+                          </span>
+                          {b.price_per_seat && b.price_per_seat > 0 && (
+                            <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full font-semibold text-foreground">
+                              {b.price_per_seat * b.seats_count} ₽
+                            </span>
                           )}
                         </div>
-                        <Badge variant={b.status === 'confirmed' ? 'default' : b.status === 'cancelled' ? 'destructive' : 'secondary'}
-                          className="text-xs flex-shrink-0">
-                          {b.status === 'confirmed' ? 'Подтверждено' : b.status === 'cancelled' ? 'Отменено' : 'Ожидание'}
+                        <Badge variant={statusVariant(b.status)} className="text-xs flex-shrink-0 ml-2">
+                          {statusLabel(b.status)}
                         </Badge>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-muted-foreground">
-                          {b.seats_count} мест · {b.price_per_seat ? `${b.price_per_seat * b.seats_count} ₽` : 'Договорная'}
-                        </div>
-                        {b.cancel_token && b.status !== 'cancelled' && (
-                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => cancelBooking(b.cancel_token!)}>
-                            Отменить
-                          </Button>
-                        )}
-                      </div>
+
+                      {/* Cancel */}
+                      {b.cancel_token && b.status !== 'cancelled' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-3 w-full min-h-[40px] text-xs text-red-600 border-red-300 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/20"
+                          onClick={() => cancelBooking(b.cancel_token!)}
+                        >
+                          <Icon name="X" className="h-3.5 w-3.5 mr-1.5" />
+                          Отменить бронирование
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -436,95 +631,205 @@ const PassengerCabinet = () => {
             )}
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
 
-      {/* Диалог создания поездки */}
+      {/* ── FAB: propose ride ── */}
+      <button
+        onClick={() => setCreateDialog(true)}
+        className="fixed bottom-6 right-4 md:right-6 z-50 h-14 px-5 rounded-full gradient-primary text-white shadow-lg flex items-center gap-2 font-semibold hover:scale-105 active:scale-95 transition-transform"
+        aria-label="Предложить поездку"
+      >
+        <Icon name="Plus" className="h-5 w-5" />
+        <span className="hidden sm:inline">Предложить поездку</span>
+      </button>
+
+      {/* ════════════════════════════════════════════════
+          DIALOG: Create ride
+      ════════════════════════════════════════════════ */}
       <Dialog open={createDialog} onOpenChange={setCreateDialog}>
-        <DialogContent className="max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="mx-3 rounded-2xl max-w-sm max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Предложить поездку</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-sm">Откуда</Label>
-              <Input className="mt-1" placeholder="Сочи, аэропорт" value={createForm.route_from}
-                onChange={e => setCreateForm(f => ({ ...f, route_from: e.target.value }))} />
+          <div className="space-y-3 pt-1">
+            {/* From */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">
+                <Icon name="MapPin" className="inline h-3.5 w-3.5 mr-1 text-green-500" />
+                Откуда
+              </Label>
+              <Input
+                className="h-11"
+                placeholder="Сочи, аэропорт"
+                value={createForm.route_from}
+                onChange={e => setCreateForm(f => ({ ...f, route_from: e.target.value }))}
+              />
             </div>
-            <div>
-              <Label className="text-sm">Куда</Label>
-              <Input className="mt-1" placeholder="Гагра, Пицунда..." value={createForm.route_to}
-                onChange={e => setCreateForm(f => ({ ...f, route_to: e.target.value }))} />
+            {/* To */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">
+                <Icon name="Navigation" className="inline h-3.5 w-3.5 mr-1 text-red-500" />
+                Куда
+              </Label>
+              <Input
+                className="h-11"
+                placeholder="Гагра, Пицунда, Сухум..."
+                value={createForm.route_to}
+                onChange={e => setCreateForm(f => ({ ...f, route_to: e.target.value }))}
+              />
             </div>
-            <div>
-              <Label className="text-sm">Дата и время</Label>
-              <Input className="mt-1" type="datetime-local" value={createForm.departure_datetime}
-                onChange={e => setCreateForm(f => ({ ...f, departure_datetime: e.target.value }))} />
+            {/* Datetime */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">
+                <Icon name="Calendar" className="inline h-3.5 w-3.5 mr-1 text-primary" />
+                Дата и время
+              </Label>
+              <Input
+                className="h-11"
+                type="datetime-local"
+                min={nowDatetimeLocal()}
+                value={createForm.departure_datetime}
+                onChange={e => setCreateForm(f => ({ ...f, departure_datetime: e.target.value }))}
+              />
             </div>
+            {/* Seats + Price */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">Мест</Label>
-                <Input className="mt-1" type="number" min="1" max="8" value={createForm.seats_total}
-                  onChange={e => setCreateForm(f => ({ ...f, seats_total: e.target.value }))} />
+              <div className="space-y-1.5">
+                <Label className="text-sm">Свободных мест</Label>
+                <Input
+                  className="h-11"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="8"
+                  value={createForm.seats_total}
+                  onChange={e => setCreateForm(f => ({ ...f, seats_total: e.target.value }))}
+                />
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label className="text-sm">Цена/чел (₽)</Label>
-                <Input className="mt-1" type="number" min="0" placeholder="0" value={createForm.price_per_seat}
-                  onChange={e => setCreateForm(f => ({ ...f, price_per_seat: e.target.value }))} />
+                <Input
+                  className="h-11"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  placeholder="0 = договорная"
+                  value={createForm.price_per_seat}
+                  onChange={e => setCreateForm(f => ({ ...f, price_per_seat: e.target.value }))}
+                />
               </div>
             </div>
-            <div>
-              <Label className="text-sm">Класс авто</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
+            {/* Car class */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Класс автомобиля</Label>
+              <div className="grid grid-cols-2 gap-2">
                 {Object.entries(CAR_CLASS_LABELS).map(([v, l]) => (
-                  <button key={v} onClick={() => setCreateForm(f => ({ ...f, car_class: v }))}
-                    className={`text-sm py-2 px-3 rounded-lg border transition-colors ${createForm.car_class === v ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted/50'}`}>
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setCreateForm(f => ({ ...f, car_class: v }))}
+                    className={`text-sm py-2.5 px-3 rounded-xl border-2 transition-colors font-medium ${
+                      createForm.car_class === v
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border hover:bg-muted/50 text-muted-foreground'
+                    }`}
+                  >
                     {l}
                   </button>
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="text-sm">Комментарий</Label>
-              <Textarea className="mt-1" placeholder="Дополнительная информация..." rows={2} value={createForm.notes}
-                onChange={e => setCreateForm(f => ({ ...f, notes: e.target.value }))} />
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Комментарий <span className="text-muted-foreground font-normal">(необязательно)</span></Label>
+              <Textarea
+                placeholder="Дополнительная информация для пассажиров..."
+                rows={2}
+                value={createForm.notes}
+                onChange={e => setCreateForm(f => ({ ...f, notes: e.target.value }))}
+              />
             </div>
-            <Button className="w-full gradient-primary text-white" onClick={createRide}>
+            <Button
+              className="w-full gradient-primary text-white min-h-[48px] text-base font-semibold"
+              onClick={createRide}
+            >
+              <Icon name="Plus" className="mr-2 h-4 w-4" />
               Создать поездку
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Диалог бронирования */}
-      <Dialog open={bookDialog} onOpenChange={setBookDialog}>
-        <DialogContent className="max-w-sm mx-4">
+      {/* ════════════════════════════════════════════════
+          DIALOG: Book a seat
+      ════════════════════════════════════════════════ */}
+      <Dialog open={bookDialog} onOpenChange={v => { setBookDialog(v); if (!v) setSelectedRide(null); }}>
+        <DialogContent className="mx-3 rounded-2xl max-w-sm">
           <DialogHeader>
             <DialogTitle>Забронировать место</DialogTitle>
           </DialogHeader>
           {selectedRide && (
-            <div className="space-y-4">
-              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
-                <p className="font-medium">{selectedRide.route_from} → {selectedRide.route_to}</p>
-                <p className="text-muted-foreground">{formatDate(selectedRide.departure_datetime)}</p>
-                <p className="text-muted-foreground">Доступно мест: {selectedRide.seats_available}</p>
+            <div className="space-y-4 pt-1">
+              {/* Ride summary */}
+              <div className="bg-muted/40 rounded-xl p-3 space-y-2">
+                <RoutePin from={selectedRide.route_from} to={selectedRide.route_to} />
+                <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Icon name="Calendar" className="h-3 w-3" />
+                    {formatDate(selectedRide.departure_datetime)}
+                  </span>
+                  <span className="flex items-center gap-1 text-green-600">
+                    <Icon name="Users" className="h-3 w-3" />
+                    {selectedRide.seats_available} мест доступно
+                  </span>
+                </div>
               </div>
-              <div>
+
+              {/* Seat count stepper */}
+              <div className="space-y-1.5">
                 <Label className="text-sm">Количество мест</Label>
-                <Input className="mt-1" type="number" min="1" max={selectedRide.seats_available}
-                  value={bookForm.seats_count}
-                  onChange={e => setBookForm({ seats_count: e.target.value })} />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setBookForm(f => ({ seats_count: String(Math.max(1, parseInt(f.seats_count) - 1)) }))}
+                    disabled={bookSeats <= 1}
+                    className="w-11 h-11 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors disabled:opacity-30"
+                  >
+                    <Icon name="Minus" className="h-4 w-4" />
+                  </button>
+                  <div className="flex-1 text-center">
+                    <span className="text-2xl font-bold">{bookSeats}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBookForm(f => ({ seats_count: String(Math.min(selectedRide.seats_available, parseInt(f.seats_count) + 1)) }))}
+                    disabled={bookSeats >= selectedRide.seats_available}
+                    className="w-11 h-11 rounded-xl border-2 border-border flex items-center justify-center hover:border-primary transition-colors disabled:opacity-30"
+                  >
+                    <Icon name="Plus" className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
+
+              {/* Total */}
               {selectedRide.price_per_seat > 0 && (
-                <div className="flex items-center justify-between font-bold text-lg">
-                  <span>Итого:</span>
-                  <span className="text-primary">{selectedRide.price_per_seat * parseInt(bookForm.seats_count || '1')} ₽</span>
+                <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-4 py-3">
+                  <span className="text-sm font-medium">Итого</span>
+                  <span className="text-xl font-bold text-primary">{bookTotal} ₽</span>
                 </div>
               )}
-              <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
-                <Icon name="Info" className="h-3 w-3 inline mr-1" />
-                Контактные данные будут переданы организатору поездки
+
+              {/* Info */}
+              <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/40 rounded-xl p-3">
+                <Icon name="Info" className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                <span>Ваши контакты будут переданы организатору поездки для подтверждения.</span>
               </div>
-              <Button className="w-full gradient-primary text-white" onClick={bookRide}>
+
+              <Button
+                className="w-full gradient-primary text-white min-h-[48px] text-base font-semibold"
+                onClick={bookRide}
+              >
+                <Icon name="CheckCircle2" className="mr-2 h-5 w-5" />
                 Подтвердить бронирование
               </Button>
             </div>

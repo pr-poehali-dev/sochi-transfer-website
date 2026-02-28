@@ -1,9 +1,16 @@
 User-agent: *
 Allow: /
+Allow: /tariffs
+Allow: /become-driver
+Allow: /news
+Allow: /rideshares
+Allow: /driver/register
+Allow: /auth
 Disallow: /admin
 Disallow: /admin/login
 Disallow: /driver/cabinet
 Disallow: /profile
+Disallow: /passenger
 
 Sitemap: https://transfer-abkhazia.ru/sitemap.xml
 
@@ -13,7 +20,7 @@ Disallow: /admin
 Disallow: /driver/cabinet
 Disallow: /profile
 
-User-agent: Yandex
+User-agent: Yandexbot
 Allow: /
 Disallow: /admin
 Disallow: /driver/cabinet
@@ -21,3 +28,4 @@ Disallow: /profile
 
 User-agent: Bingbot
 Allow: /
+Disallow: /admin

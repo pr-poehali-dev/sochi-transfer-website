@@ -102,6 +102,7 @@ const SiteSettingsManager = () => {
         <TabsTrigger value="texts">Тексты сайта</TabsTrigger>
         <TabsTrigger value="rules">Правила/Политика</TabsTrigger>
         <TabsTrigger value="services">Допуслуги</TabsTrigger>
+        <TabsTrigger value="drivers_settings">Водители</TabsTrigger>
       </TabsList>
 
       <TabsContent value="seo">
@@ -297,6 +298,65 @@ const SiteSettingsManager = () => {
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="drivers_settings">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Настройки водителей</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Комиссия по умолчанию (%) для новых водителей</Label>
+                <Input
+                  type="number" min="0" max="50"
+                  value={settings['default_driver_commission'] || '15'}
+                  onChange={e => set('default_driver_commission', e.target.value)}
+                  placeholder="15"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Процент, который платит водитель с каждого заказа. Индивидуально настраивается в карточке водителя.</p>
+              </div>
+              <div>
+                <Label>Лимит регистрации водителей (0 = без лимита)</Label>
+                <Input
+                  type="number" min="0"
+                  value={settings['driver_registration_limit'] || '0'}
+                  onChange={e => set('driver_registration_limit', e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label>Минимальный баланс для работы (₽)</Label>
+                <Input
+                  type="number" min="0"
+                  value={settings['driver_min_balance'] || '0'}
+                  onChange={e => set('driver_min_balance', e.target.value)}
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Водители с балансом ниже этого значения не могут принимать заказы.</p>
+              </div>
+              <SaveButton keys={['default_driver_commission', 'driver_registration_limit', 'driver_min_balance']} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Страница "Стать водителем"</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Заголовок страницы</Label>
+                <Input value={settings['become_driver_hero_subtitle'] || ''} onChange={e => set('become_driver_hero_subtitle', e.target.value)} placeholder="Зарабатывайте на своём автомобиле..." />
+              </div>
+              <div>
+                <Label>Список требований (через ; или с новой строки)</Label>
+                <Textarea value={settings['driver_requirement_list'] || ''} onChange={e => set('driver_requirement_list', e.target.value)} rows={4} placeholder="Водительское удостоверение категории B;Автомобиль не старше 2015 года;ОСАГО и КАСКО" />
+              </div>
+              <div>
+                <Label>Ставка комиссии (отображается на странице)</Label>
+                <Input value={settings['driver_commission_rate'] || '15'} onChange={e => set('driver_commission_rate', e.target.value)} placeholder="15" />
+              </div>
+              <SaveButton keys={['become_driver_hero_subtitle', 'driver_requirement_list', 'driver_commission_rate']} />
+            </CardContent>
+          </Card>
+        </div>
       </TabsContent>
     </Tabs>
   );

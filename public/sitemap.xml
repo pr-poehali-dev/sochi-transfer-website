@@ -10,6 +10,20 @@
   </url>
 
   <url>
+    <loc>https://transfer-abkhazia.ru/tariffs</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <lastmod>2026-02-28</lastmod>
+  </url>
+
+  <url>
+    <loc>https://transfer-abkhazia.ru/become-driver</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <lastmod>2026-02-28</lastmod>
+  </url>
+
+  <url>
     <loc>https://transfer-abkhazia.ru/news</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -24,16 +38,16 @@
   </url>
 
   <url>
-    <loc>https://transfer-abkhazia.ru/auth</loc>
+    <loc>https://transfer-abkhazia.ru/driver/register</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.7</priority>
     <lastmod>2026-02-28</lastmod>
   </url>
 
   <url>
-    <loc>https://transfer-abkhazia.ru/driver/register</loc>
+    <loc>https://transfer-abkhazia.ru/auth</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.5</priority>
     <lastmod>2026-02-28</lastmod>
   </url>
 

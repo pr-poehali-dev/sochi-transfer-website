@@ -16,6 +16,8 @@ import NotFound from "./pages/NotFound";
 import NewsPage from "./pages/NewsPage";
 import PassengerCabinet from "./pages/PassengerCabinet";
 import PushNotificationBanner from "./components/PushNotificationBanner";
+import BecomeDriverPage from "./pages/BecomeDriverPage";
+import TariffsPage from "./pages/TariffsPage";
 
 const queryClient = new QueryClient();
 
@@ -32,8 +34,10 @@ const AppContent = () => {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/profile" element={<UserProfile />} />
         <Route path="/driver/register" element={<DriverRegister />} />
+        <Route path="/become-driver" element={<BecomeDriverPage />} />
         <Route path="/driver/login" element={<DriverLogin />} />
         <Route path="/driver/cabinet" element={<DriverCabinet />} />
+        <Route path="/tariffs" element={<TariffsPage />} />
         <Route path="/news" element={<NewsPage />} />
         <Route path="/passenger" element={<PassengerCabinet />} />
         <Route path="/admin/login" element={<AdminLogin />} />
