@@ -18,6 +18,7 @@ import DriversManager from '@/components/admin/DriversManager';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
 import TransferClassesManager from '@/components/admin/TransferClassesManager';
 import UsersManager from '@/components/admin/UsersManager';
+import ManagersManager from '@/components/admin/ManagersManager';
 
 interface Withdrawal {
   id: number;
@@ -249,6 +250,10 @@ const AdminDashboard = () => {
                 <Icon name="Settings" className="mr-1.5 h-4 w-4" />
                 Настройки
               </TabsTrigger>
+              <TabsTrigger value="team">
+                <Icon name="UserCog" className="mr-1.5 h-4 w-4" />
+                Команда
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -290,6 +295,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="transfer_classes">
             <TransferClassesManager />
+          </TabsContent>
+
+          <TabsContent value="team">
+            <ManagersManager />
           </TabsContent>
 
           <TabsContent value="finance">

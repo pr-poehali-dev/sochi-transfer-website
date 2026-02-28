@@ -30,6 +30,20 @@ interface Order {
   tariff_city?: string;
   notes?: string;
   created_at: string;
+  driver_id?: number;
+  driver_name?: string;
+  driver_phone?: string;
+}
+
+interface Driver {
+  id: number;
+  name: string;
+  phone: string;
+  car_brand: string;
+  car_model: string;
+  car_number: string;
+  status: string;
+  is_active: boolean;
 }
 
 interface Status {
@@ -49,13 +63,17 @@ const PAYMENT_LABELS: Record<string, string> = { full: 'Полная', prepay: '
 const OrdersManager = ({ onUpdate }: OrdersManagerProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [assigningDriver, setAssigningDriver] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     loadOrders();
     loadStatuses();
+    loadDrivers();
   }, []);
 
   const loadOrders = async () => {
@@ -73,9 +91,34 @@ const OrdersManager = ({ onUpdate }: OrdersManagerProps) => {
       const response = await fetch(API_URLS.statuses);
       const data = await response.json();
       setStatuses(data.statuses || []);
-    } catch (error) {
-      console.error('Failed to load statuses:', error);
+    } catch { /* silent */ }
+  };
+
+  const loadDrivers = async () => {
+    try {
+      const r = await fetch(`${API_URLS.drivers}&action=list`);
+      const d = await r.json();
+      setDrivers((d.drivers || []).filter((dr: Driver) => dr.status === 'approved' && dr.is_active));
+    } catch { /* silent */ }
+  };
+
+  const assignDriver = async (orderId: number, driverId: string) => {
+    if (!driverId) return;
+    setAssigningDriver(true);
+    try {
+      await fetch(API_URLS.orders, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId, driver_id: parseInt(driverId), status_id: 2 })
+      });
+      toast({ title: 'Водитель назначен' });
+      loadOrders();
+      onUpdate();
+      setSelectedDriverId('');
+    } catch {
+      toast({ title: 'Ошибка назначения', variant: 'destructive' });
     }
+    setAssigningDriver(false);
   };
 
   const handleStatusChange = async (orderId: number, newStatusId: number) => {
@@ -293,6 +336,41 @@ const OrdersManager = ({ onUpdate }: OrdersManagerProps) => {
                 <Badge style={{ backgroundColor: selectedOrder.status_color }} className="text-white border-0 px-4 py-2 text-base">
                   {selectedOrder.status_name}
                 </Badge>
+              </div>
+
+              {/* Назначение водителя */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-muted-foreground mb-2">Водитель</p>
+                {selectedOrder.driver_name ? (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Icon name="User" className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="font-medium text-green-800">{selectedOrder.driver_name}</p>
+                        <p className="text-sm text-green-600">{selectedOrder.driver_phone}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Выберите водителя..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {drivers.map(d => (
+                          <SelectItem key={d.id} value={d.id.toString()}>
+                            {d.name} — {d.car_brand} {d.car_model} ({d.car_number})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button className="gradient-primary text-white" disabled={!selectedDriverId || assigningDriver}
+                      onClick={() => assignDriver(selectedOrder.id, selectedDriverId)}>
+                      {assigningDriver ? <Icon name="Loader2" className="h-4 w-4 animate-spin" /> : 'Назначить'}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}

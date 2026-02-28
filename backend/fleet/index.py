@@ -4,59 +4,44 @@ import base64
 import boto3
 import psycopg2
 
+SCHEMA = 't_p8223105_sochi_transfer_websi'
+CORS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Authorization, X-User-Id',
+}
+
+def resp(status, body):
+    return {'statusCode': status, 'headers': {'Content-Type': 'application/json', **CORS},
+            'body': json.dumps(body, default=str), 'isBase64Encoded': False}
+
+def get_conn():
+    return psycopg2.connect(os.environ.get('DATABASE_URL'))
+
 def handler(event: dict, context) -> dict:
     '''API для управления автопарком'''
+    if event.get('httpMethod') == 'OPTIONS':
+        return {'statusCode': 200, 'headers': {**CORS, 'Access-Control-Max-Age': '86400'}, 'body': ''}
+
     method = event.get('httpMethod', 'GET')
-    
-    if method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-            },
-            'body': '',
-            'isBase64Encoded': False
-        }
-    
+    params = event.get('queryStringParameters', {}) or {}
+
     try:
-        dsn = os.environ.get('DATABASE_URL')
-        conn = psycopg2.connect(dsn)
+        conn = get_conn()
         cur = conn.cursor()
-        
+
         if method == 'GET':
-            active_only = event.get('queryStringParameters', {}).get('active', 'false') == 'true'
-            
-            if active_only:
-                cur.execute('SELECT * FROM fleet WHERE is_active = true ORDER BY name')
-            else:
-                cur.execute('SELECT * FROM fleet ORDER BY name')
-            
-            columns = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
-            fleet = [dict(zip(columns, row)) for row in rows]
-            
-            for car in fleet:
-                if car.get('created_at'):
-                    car['created_at'] = car['created_at'].isoformat()
-                if car.get('updated_at'):
-                    car['updated_at'] = car['updated_at'].isoformat()
-            
-            cur.close()
-            conn.close()
-            
-            return {
-                'statusCode': 200,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'fleet': fleet}),
-                'isBase64Encoded': False
-            }
-        
+            active_only = params.get('active', 'false') == 'true'
+            q = f"SELECT * FROM {SCHEMA}.fleet" + (" WHERE is_active=true" if active_only else "") + " ORDER BY id"
+            cur.execute(q)
+            cols = [d[0] for d in cur.description]
+            fleet = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'fleet': fleet})
+
         elif method == 'POST':
             data = json.loads(event.get('body', '{}'))
-            
-            # Загрузка фото в S3
+
             if data.get('action') == 'upload_photo':
                 cur.close(); conn.close()
                 try:
@@ -70,102 +55,50 @@ def handler(event: dict, context) -> dict:
                     key = f'fleet/{uuid.uuid4()}.{ext}'
                     img_data = base64.b64decode(data.get('data', ''))
                     s3.put_object(Bucket='files', Key=key, Body=img_data, ContentType=data.get('content_type', 'image/jpeg'))
-                    access_key = os.environ['AWS_ACCESS_KEY_ID']
-                    cdn_url = f"https://cdn.poehali.dev/projects/{access_key}/bucket/{key}"
-                    return {
-                        'statusCode': 200,
-                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                        'body': json.dumps({'url': cdn_url}),
-                        'isBase64Encoded': False
-                    }
+                    cdn_url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+                    return resp(200, {'url': cdn_url})
                 except Exception as e:
-                    return {
-                        'statusCode': 500,
-                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                        'body': json.dumps({'error': str(e)}),
-                        'isBase64Encoded': False
-                    }
-            
-            cur.execute('''
-                INSERT INTO fleet (name, type, capacity, luggage_capacity, features, 
+                    return resp(500, {'error': str(e)})
+
+            cur.execute(f'''
+                INSERT INTO {SCHEMA}.fleet (name, type, capacity, luggage_capacity, features,
                                  image_url, image_emoji, is_active)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
             ''', (
-                data.get('name'),
-                data.get('type'),
-                data.get('capacity'),
-                data.get('luggage_capacity'),
-                data.get('features', []),
-                data.get('image_url'),
-                data.get('image_emoji', '🚗'),
+                data.get('name'), data.get('type'), data.get('capacity'),
+                data.get('luggage_capacity'), data.get('features', []),
+                data.get('image_url'), data.get('image_emoji', '🚗'),
                 data.get('is_active', True)
             ))
-            
             fleet_id = cur.fetchone()[0]
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return {
-                'statusCode': 201,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'id': fleet_id, 'message': 'Автомобиль добавлен'}),
-                'isBase64Encoded': False
-            }
-        
+            conn.commit(); cur.close(); conn.close()
+            return resp(201, {'id': fleet_id, 'message': 'Автомобиль добавлен'})
+
         elif method == 'PUT':
             data = json.loads(event.get('body', '{}'))
-            fleet_id = data.get('id')
-            
-            cur.execute('''
-                UPDATE fleet 
-                SET name = %s, type = %s, capacity = %s, luggage_capacity = %s,
-                    features = %s, image_url = %s, image_emoji = %s, is_active = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
+            cur.execute(f'''
+                UPDATE {SCHEMA}.fleet
+                SET name=%s, type=%s, capacity=%s, luggage_capacity=%s,
+                    features=%s, image_url=%s, image_emoji=%s, is_active=%s,
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE id=%s
             ''', (
-                data.get('name'),
-                data.get('type'),
-                data.get('capacity'),
-                data.get('luggage_capacity'),
-                data.get('features'),
-                data.get('image_url'),
-                data.get('image_emoji'),
-                data.get('is_active'),
-                fleet_id
+                data.get('name'), data.get('type'), data.get('capacity'),
+                data.get('luggage_capacity'), data.get('features'),
+                data.get('image_url'), data.get('image_emoji'),
+                data.get('is_active'), data.get('id')
             ))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return {
-                'statusCode': 200,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'message': 'Автомобиль обновлен'}),
-                'isBase64Encoded': False
-            }
-        
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Автомобиль обновлён'})
+
         elif method == 'DELETE':
-            fleet_id = event.get('queryStringParameters', {}).get('id')
-            
-            cur.execute('DELETE FROM fleet WHERE id = %s', (fleet_id,))
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return {
-                'statusCode': 200,
-                'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                'body': json.dumps({'message': 'Автомобиль удален'}),
-                'isBase64Encoded': False
-            }
-        
+            fid = params.get('id', '0')
+            cur.execute(f"DELETE FROM {SCHEMA}.fleet WHERE id=%s", (int(fid),))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Автомобиль удалён'})
+
+        cur.close(); conn.close()
+        return resp(405, {'error': 'Method not allowed'})
+
     except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps({'error': str(e)}),
-            'isBase64Encoded': False
-        }
+        return resp(500, {'error': str(e)})

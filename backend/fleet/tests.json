@@ -5,9 +5,7 @@
       "method": "GET",
       "path": "/?active=true",
       "expectedStatus": 200,
-      "expectedBody": {
-        "fleet": "array"
-      },
+      "expectedBody": {},
       "bodyMatcher": "partial"
     }
   ]

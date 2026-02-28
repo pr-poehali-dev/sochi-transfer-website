@@ -78,6 +78,50 @@ def handle_admin(method, event, params, data):
                 return resp(200, {'token': token, 'admin': {'id': aid, 'email': aemail, 'name': name, 'role': role or 'admin'}})
             cur.close(); conn.close()
             return resp(401, {'error': 'Неверный email или пароль'})
+        elif action == 'create':
+            email = data.get('email', '').strip()
+            name = data.get('name', '').strip()
+            password = data.get('password', '')
+            role = data.get('role', 'manager')
+            if not email or not name or not password:
+                return resp(400, {'error': 'Email, имя и пароль обязательны'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id FROM {SCHEMA}.admins WHERE email=%s", (email,))
+            if cur.fetchone():
+                cur.close(); conn.close(); return resp(400, {'error': 'Пользователь с таким email уже существует'})
+            cur.execute(f"INSERT INTO {SCHEMA}.admins (email,name,password_hash,role,is_active) VALUES (%s,%s,%s,%s,true) RETURNING id",
+                        (email, name, hash_password(password), role))
+            aid = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            return resp(201, {'id': aid, 'message': f'{role} создан'})
+        elif action == 'update':
+            aid = data.get('id')
+            if not aid:
+                return resp(400, {'error': 'id обязателен'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"UPDATE {SCHEMA}.admins SET name=%s,email=%s,role=%s,is_active=%s WHERE id=%s",
+                        (data.get('name'), data.get('email'), data.get('role','manager'), data.get('is_active',True), int(aid)))
+            if data.get('new_password'):
+                cur.execute(f"UPDATE {SCHEMA}.admins SET password_hash=%s WHERE id=%s", (hash_password(data['new_password']), int(aid)))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Обновлено'})
+        elif action == 'delete':
+            aid = data.get('id')
+            if not aid:
+                return resp(400, {'error': 'id обязателен'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"UPDATE {SCHEMA}.admins SET is_active=false WHERE id=%s", (int(aid),))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Заблокирован'})
+    elif method == 'GET':
+        action = params.get('action', '')
+        if action == 'list':
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id,email,name,role,is_active,last_login,created_at FROM {SCHEMA}.admins ORDER BY created_at DESC")
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'admins': rows})
     return resp(405, {'error': 'Method not allowed'})
 
 

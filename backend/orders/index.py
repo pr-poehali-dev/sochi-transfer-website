@@ -215,12 +215,14 @@ def handle_orders(method, event):
                        o.passenger_name, o.passenger_phone, o.price, o.created_at,
                        o.transfer_type, o.car_class, o.payment_type, o.prepay_amount,
                        o.passengers_count, o.flight_number, o.passenger_email, o.status_id,
-                       o.notes,
+                       o.notes, o.driver_id,
                        s.name as status_name, s.color as status_color,
-                       t.city as tariff_city
+                       t.city as tariff_city,
+                       d.name as driver_name, d.phone as driver_phone
                 FROM {SCHEMA}.orders o
                 LEFT JOIN {SCHEMA}.order_statuses s ON o.status_id = s.id
                 LEFT JOIN {SCHEMA}.tariffs t ON o.tariff_id = t.id
+                LEFT JOIN {SCHEMA}.drivers d ON o.driver_id = d.id
                 ORDER BY o.created_at DESC
             ''')
         cols = [d[0] for d in cur.description]
@@ -320,31 +322,30 @@ def handle_orders(method, event):
         data = json.loads(event.get('body', '{}'))
         order_id = data.get('id')
         new_status_id = data.get('status_id')
-        # Получаем user_id и текущий статус до обновления
+        driver_id = data.get('driver_id')
         user_id_for_push = None
         status_name_for_push = None
-        if order_id and new_status_id:
+        if order_id:
             cur.execute(f"SELECT user_id FROM {SCHEMA}.orders WHERE id=%s", (int(order_id),))
             row = cur.fetchone()
-            if row:
-                user_id_for_push = row[0]
+            if row: user_id_for_push = row[0]
+        if new_status_id:
             cur.execute(f"SELECT name FROM {SCHEMA}.order_statuses WHERE id=%s", (int(new_status_id),))
             srow = cur.fetchone()
-            if srow:
-                status_name_for_push = srow[0]
-        cur.execute(f'''
-            UPDATE {SCHEMA}.orders SET status_id=%s, price=%s, notes=%s, updated_at=CURRENT_TIMESTAMP
-            WHERE id=%s
-        ''', (new_status_id, data.get('price'), data.get('notes'), order_id))
+            if srow: status_name_for_push = srow[0]
+        if driver_id and order_id:
+            cur.execute(f'''
+                UPDATE {SCHEMA}.orders SET driver_id=%s, status_id=COALESCE(%s, status_id),
+                updated_at=CURRENT_TIMESTAMP WHERE id=%s
+            ''', (int(driver_id), new_status_id, int(order_id)))
+        else:
+            cur.execute(f'''
+                UPDATE {SCHEMA}.orders SET status_id=%s, price=%s, notes=%s, updated_at=CURRENT_TIMESTAMP
+                WHERE id=%s
+            ''', (new_status_id, data.get('price'), data.get('notes'), order_id))
         conn.commit(); cur.close(); conn.close()
-        # Отправляем push пользователю о смене статуса
         if user_id_for_push and status_name_for_push:
-            send_push_to_user(
-                user_id_for_push,
-                f'Статус заявки #{order_id} изменён',
-                f'Новый статус: {status_name_for_push}',
-                '/profile'
-            )
+            send_push_to_user(user_id_for_push, f'Статус заявки #{order_id} изменён', f'Новый статус: {status_name_for_push}', '/profile')
         return resp(200, {'message': 'Заявка обновлена'})
 
     elif method == 'DELETE':
