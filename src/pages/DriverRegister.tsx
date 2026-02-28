@@ -232,6 +232,8 @@ const DriverRegister = () => {
     car_color: '',
     car_number: '',
     car_number_country: 'RUS',
+    driver_type: 'transfer',
+    car_category: 'sedan',
   });
 
   // Document files — stored as { preview (dataURL), name, file }
@@ -331,6 +333,8 @@ const DriverRegister = () => {
         car_color: form.car_color,
         car_number: form.car_number.trim().toUpperCase(),
         car_number_country: form.car_number_country,
+        driver_type: form.driver_type,
+        car_category: form.car_category,
         files: {},
         car_photos: [],
       };
@@ -416,6 +420,58 @@ const DriverRegister = () => {
                   <CardDescription>ФИО, телефон и пароль для входа</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* ── Driver type selection ── */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">
+                      Тип водителя<span className="text-red-500 ml-0.5">*</span>
+                    </Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        {
+                          value: 'transfer',
+                          icon: 'Car',
+                          label: 'Водитель трансфера',
+                          desc: 'Принимаю заказы трансфера аэропорт/вокзал',
+                        },
+                        {
+                          value: 'rideshare',
+                          icon: 'Users',
+                          label: 'Водитель попутчиков',
+                          desc: 'Предлагаю поездки попутчикам',
+                        },
+                      ].map(opt => {
+                        const active = form.driver_type === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setField('driver_type', opt.value)}
+                            className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all min-h-[72px] w-full ${
+                              active
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border bg-white/40 dark:bg-white/5 hover:border-primary/40'
+                            }`}
+                          >
+                            <div
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                                active ? 'gradient-primary' : 'bg-muted'
+                              }`}
+                            >
+                              <Icon
+                                name={opt.icon as Parameters<typeof Icon>[0]['name']}
+                                className={`h-5 w-5 ${active ? 'text-white' : 'text-muted-foreground'}`}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm leading-tight">{opt.label}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{opt.desc}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <FieldWrap label="ФИО" req>
                     <Input
                       placeholder="Иванов Иван Иванович"
@@ -573,6 +629,33 @@ const DriverRegister = () => {
                       className="h-11 font-mono tracking-wider"
                     />
                   </FieldWrap>
+
+                  {/* ── Car category ── */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Тип кузова</Label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: 'sedan', label: 'Седан' },
+                        { value: 'minivan', label: 'Минивэн' },
+                      ].map(opt => {
+                        const active = form.car_category === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setField('car_category', opt.value)}
+                            className={`flex-1 py-2.5 px-4 rounded-xl border-2 text-sm font-medium transition-all min-h-[44px] ${
+                              active
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-white/40 dark:bg-white/5 hover:border-primary/40 text-muted-foreground'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   {/* Car photo upload (optional, no base64 sent) */}
                   <div className="space-y-1.5">

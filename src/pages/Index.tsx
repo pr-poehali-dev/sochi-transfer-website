@@ -118,6 +118,7 @@ const Index = () => {
   // ── Derived settings ──────────────────────────────────────────────────────
   const whatsappUrl   = settings['whatsapp_number']   ? `https://wa.me/${settings['whatsapp_number']}` : 'https://wa.me/79000000000';
   const telegramUrl   = settings['telegram_username'] ? `https://t.me/${settings['telegram_username']}` : '#';
+  const telegramGroupUrl = settings['telegram_group_url'] || settings['site_telegram_url'] || '';
   const viberUrl      = settings['viber_number']      ? `viber://chat?number=${settings['viber_number']}` : '#';
   const vkUrl         = settings['vk_url']            || '#';
   const instagramUrl  = settings['instagram_url']     || '#';
@@ -218,6 +219,14 @@ const Index = () => {
                 <a href={telegramUrl} target="_blank" rel="noopener noreferrer">
                   <Button variant="ghost" size="icon" className="hover:scale-110 transition-transform" title="Telegram">
                     <Icon name="Send" className="h-5 w-5 text-blue-500" />
+                  </Button>
+                </a>
+              )}
+              {telegramGroupUrl && settings['telegram_group_show'] !== 'false' && (
+                <a href={telegramGroupUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50 gap-1.5">
+                    <Icon name="Send" className="h-3.5 w-3.5" />
+                    {settings['telegram_group_title'] || 'Группа'}
                   </Button>
                 </a>
               )}

@@ -202,14 +202,26 @@ const BecomeDriverPage = () => {
             </div>
             <span className="font-bold text-gradient">ПоехалиПро</span>
           </button>
-          <Button
-            size="sm"
-            className="gradient-primary text-white min-h-[40px] px-4"
-            onClick={() => navigate('/driver/register')}
-          >
-            <Icon name="UserPlus" className="mr-1.5 h-3.5 w-3.5" />
-            Стать водителем
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-[40px] text-muted-foreground"
+              onClick={() => navigate('/')}
+            >
+              <Icon name="ArrowLeft" className="mr-1 h-4 w-4" />
+              <span className="hidden sm:inline">Назад</span>
+            </Button>
+            <Button
+              size="sm"
+              className="gradient-primary text-white min-h-[40px] px-4"
+              onClick={() => navigate('/driver/register')}
+            >
+              <Icon name="UserPlus" className="mr-1.5 h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Стать водителем</span>
+              <span className="sm:hidden">Регистрация</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -226,7 +238,7 @@ const BecomeDriverPage = () => {
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold leading-tight mb-4">
-            Стань водителем{' '}
+            {s('become_driver_hero_title', 'Станьте водителем')}{' '}
             <span className="text-gradient">ПоехалиПро</span>
           </h1>
 
@@ -282,7 +294,7 @@ const BecomeDriverPage = () => {
             title="Почему выбирают нас"
             subtitle="Присоединяйтесь к команде водителей и получайте всё необходимое для комфортной работы"
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {BENEFITS.map(b => (
               <Card key={b.title} className="border border-border hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
@@ -307,34 +319,40 @@ const BecomeDriverPage = () => {
             title="Как начать работу"
             subtitle="Всего 4 простых шага отделяют вас от первого заказа"
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {STEPS.map((step, idx) => (
-              <div key={step.num} className="relative">
-                <Card className="border border-border h-full">
-                  <CardContent className="p-5">
-                    <div className="flex items-start gap-4">
-                      {/* Step number */}
-                      <div className="flex-shrink-0">
-                        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-white font-bold text-sm">
-                          {step.num}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {STEPS.map((step, idx) => {
+              const titleKey = `become_driver_step${idx + 1}_title`;
+              const descKey  = `become_driver_step${idx + 1}_desc`;
+              const title = s(titleKey, step.title);
+              const desc  = s(descKey, step.desc);
+              return (
+                <div key={step.num} className="relative">
+                  <Card className="border border-border h-full">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-4 sm:flex-col sm:gap-3">
+                        {/* Step number */}
+                        <div className="flex-shrink-0">
+                          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center text-white font-bold text-sm">
+                            {step.num}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Icon name={step.icon as Parameters<typeof Icon>[0]['name']} className="h-4 w-4 text-primary" />
+                            <h3 className="font-semibold">{title}</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
                         </div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Icon name={step.icon as Parameters<typeof Icon>[0]['name']} className="h-4 w-4 text-primary" />
-                          <h3 className="font-semibold">{step.title}</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                {/* Connector line (desktop only, not last) */}
-                {idx < STEPS.length - 1 && (
-                  <div className="hidden sm:block absolute top-1/2 -right-2 w-4 h-0.5 bg-border z-10" />
-                )}
-              </div>
-            ))}
+                    </CardContent>
+                  </Card>
+                  {/* Connector line (lg only, not last) */}
+                  {idx < STEPS.length - 1 && (
+                    <div className="hidden lg:block absolute top-5 -right-2 w-4 h-0.5 bg-border z-10" />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -468,15 +486,42 @@ const BecomeDriverPage = () => {
                 'Регистрация занимает 5 минут. После проверки документов вы сразу можете принимать заказы.'
               )}
             </p>
-            <Button
-              size="lg"
-              className="gradient-primary text-white min-h-[56px] px-10 text-base font-semibold w-full sm:w-auto"
-              onClick={() => navigate('/driver/register')}
-            >
-              <Icon name="Rocket" className="mr-2 h-5 w-5" />
-              Зарегистрироваться водителем
-            </Button>
-            <p className="text-xs text-muted-foreground mt-4">
+
+            {/* Two driver type registration buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-4">
+              <Button
+                size="lg"
+                className="gradient-primary text-white min-h-[52px] px-6 text-sm font-semibold w-full sm:w-auto"
+                onClick={() => navigate('/driver/register?type=transfer')}
+              >
+                <Icon name="Car" className="mr-2 h-5 w-5" />
+                Регистрация водителя трансфера
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="min-h-[52px] px-6 text-sm font-semibold w-full sm:w-auto"
+                onClick={() => navigate('/driver/register?type=rideshare')}
+              >
+                <Icon name="Users" className="mr-2 h-5 w-5" />
+                Регистрация водителя попутчиков
+              </Button>
+            </div>
+
+            {/* Telegram group button (shown only if setting is set) */}
+            {settings['telegram_group_url'] && (
+              <a
+                href={settings['telegram_group_url']}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 rounded-xl border border-border text-sm font-medium hover:bg-muted/40 transition-colors mb-4 w-full sm:w-auto"
+              >
+                <Icon name="Send" className="h-4 w-4 text-blue-500" />
+                {settings['telegram_group_title'] || 'Вступить в группу Telegram'}
+              </a>
+            )}
+
+            <p className="text-xs text-muted-foreground mt-2">
               Нажимая кнопку, вы соглашаетесь с условиями оказания услуг
             </p>
           </div>

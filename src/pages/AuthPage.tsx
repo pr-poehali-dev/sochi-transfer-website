@@ -15,6 +15,39 @@ const AuthPage = () => {
   const [loading, setLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ phone: '', password: '' });
   const [regForm, setRegForm] = useState({ phone: '', name: '', email: '', password: '', password2: '' });
+  const [resetMode, setResetMode] = useState(false);
+  const [resetPhone, setResetPhone] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetNewPwd, setResetNewPwd] = useState('');
+  const [resetStep, setResetStep] = useState<1 | 2>(1);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleResetRequest = async () => {
+    if (!resetPhone) { toast({ title: 'Введите телефон', variant: 'destructive' }); return; }
+    setResetLoading(true);
+    try {
+      const r = await fetch(API_URLS.users, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'request_reset', phone: resetPhone }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Ошибка');
+      toast({ title: 'Код отправлен', description: `Код: ${d.code || '(проверьте SMS)'}` });
+      setResetStep(2);
+    } catch (err: unknown) { toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' }); }
+    finally { setResetLoading(false); }
+  };
+
+  const handleResetConfirm = async () => {
+    if (!resetCode || !resetNewPwd) { toast({ title: 'Введите код и новый пароль', variant: 'destructive' }); return; }
+    setResetLoading(true);
+    try {
+      const r = await fetch(API_URLS.users, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'confirm_reset', phone: resetPhone, code: resetCode, new_password: resetNewPwd }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Ошибка');
+      toast({ title: 'Пароль изменён! Войдите с новым паролем.' });
+      setResetMode(false); setResetStep(1); setResetCode(''); setResetNewPwd('');
+      setLoginForm(f => ({ ...f, phone: resetPhone }));
+    } catch (err: unknown) { toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' }); }
+    finally { setResetLoading(false); }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,11 +136,40 @@ const AuthPage = () => {
                     <Input type="password" placeholder="Пароль" value={loginForm.password}
                       onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))} required />
                   </div>
+                  <div className="text-right">
+                    <button type="button" className="text-xs text-primary hover:underline" onClick={() => { setResetMode(true); setResetPhone(loginForm.phone); }}>
+                      Забыли пароль?
+                    </button>
+                  </div>
                   <Button type="submit" className="w-full gradient-primary text-white" disabled={loading}>
                     {loading ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
                     Войти
                   </Button>
                 </form>
+                {resetMode && (
+                  <div className="mt-4 border-t pt-4 space-y-3">
+                    <p className="text-sm font-medium">Восстановление пароля</p>
+                    {resetStep === 1 ? (
+                      <>
+                        <Input placeholder="Телефон" value={resetPhone} onChange={e => setResetPhone(e.target.value)} />
+                        <Button className="w-full gradient-primary text-white" onClick={handleResetRequest} disabled={resetLoading}>
+                          {resetLoading ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Получить код
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Input placeholder="Код из SMS" value={resetCode} onChange={e => setResetCode(e.target.value)} />
+                        <Input type="password" placeholder="Новый пароль" value={resetNewPwd} onChange={e => setResetNewPwd(e.target.value)} />
+                        <Button className="w-full gradient-primary text-white" onClick={handleResetConfirm} disabled={resetLoading}>
+                          {resetLoading ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Сменить пароль
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="ghost" size="sm" className="w-full" onClick={() => { setResetMode(false); setResetStep(1); }}>Отмена</Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

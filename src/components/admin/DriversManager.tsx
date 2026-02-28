@@ -26,12 +26,20 @@ interface Driver {
   rating: number;
   total_orders: number;
   created_at: string;
+  driver_type?: string;
+  car_category?: string;
+  identity_verified?: boolean;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: 'На проверке', color: 'bg-yellow-100 text-yellow-800' },
   approved: { label: 'Активен', color: 'bg-green-100 text-green-800' },
   rejected: { label: 'Отклонён', color: 'bg-red-100 text-red-800' },
+};
+
+const DRIVER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  transfer: { label: 'Трансфер', color: 'bg-blue-100 text-blue-700' },
+  rideshare: { label: 'Попутчик', color: 'bg-purple-100 text-purple-700' },
 };
 
 const DriversManager = () => {
@@ -41,6 +49,7 @@ const DriversManager = () => {
   const [selected, setSelected] = useState<Driver | null>(null);
   const [commission, setCommission] = useState('15');
   const [saving, setSaving] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'transfer' | 'rideshare'>('all');
 
   const [addDialog, setAddDialog] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', phone: '', email: '', password: 'driver123', car_brand: '', car_model: '', car_color: '', car_number: '' });
@@ -140,6 +149,7 @@ const DriversManager = () => {
   };
 
   const pendingCount = drivers.filter(d => d.status === 'pending').length;
+  const filteredDrivers = typeFilter === 'all' ? drivers : drivers.filter(d => (d.driver_type || 'transfer') === typeFilter);
 
   return (
     <>
@@ -165,13 +175,21 @@ const DriversManager = () => {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {(['all', 'transfer', 'rideshare'] as const).map(t => (
+              <button key={t} onClick={() => setTypeFilter(t)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-all ${typeFilter === t ? 'bg-primary text-white border-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>
+                {t === 'all' ? `Все (${drivers.length})` : t === 'transfer' ? `Трансфер (${drivers.filter(d => (d.driver_type||'transfer')==='transfer').length})` : `Попутчики (${drivers.filter(d => d.driver_type==='rideshare').length})`}
+              </button>
+            ))}
+          </div>
           {loading ? (
             <div className="flex justify-center py-8"><Icon name="Loader2" className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : drivers.length === 0 ? (
+          ) : filteredDrivers.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">Водителей нет</p>
           ) : (
             <div className="space-y-3">
-              {drivers.map(d => (
+              {filteredDrivers.map(d => (
                 <div key={d.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 cursor-pointer transition-colors"
                   onClick={() => openDriver(d)}>
                   <div className="flex-1 min-w-0">
@@ -180,6 +198,12 @@ const DriversManager = () => {
                       <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_LABELS[d.status]?.color || 'bg-gray-100 text-gray-800'}`}>
                         {STATUS_LABELS[d.status]?.label || d.status}
                       </span>
+                      {d.driver_type && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${DRIVER_TYPE_LABELS[d.driver_type]?.color || 'bg-gray-100 text-gray-700'}`}>
+                          {DRIVER_TYPE_LABELS[d.driver_type]?.label || d.driver_type}
+                        </span>
+                      )}
+                      {d.identity_verified && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">✓ Верифицирован</span>}
                       {d.is_online && <span className="w-2 h-2 rounded-full bg-green-500" title="На линии" />}
                     </div>
                     <p className="text-sm text-muted-foreground">{d.phone} · {d.car_brand} {d.car_model} · {d.car_number}</p>
@@ -205,6 +229,15 @@ const DriversManager = () => {
           </DialogHeader>
           {selected && (
             <div className="space-y-4">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {selected.driver_type && (
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${DRIVER_TYPE_LABELS[selected.driver_type]?.color || 'bg-gray-100'}`}>
+                    {DRIVER_TYPE_LABELS[selected.driver_type]?.label || selected.driver_type}
+                  </span>
+                )}
+                {selected.identity_verified && <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">✓ Личность подтверждена</span>}
+                {selected.car_category && <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">{selected.car_category === 'minivan' ? 'Минивэн' : 'Седан'}</span>}
+              </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-muted-foreground">Телефон:</span><br />{selected.phone}</div>
                 <div><span className="text-muted-foreground">Email:</span><br />{selected.email || '—'}</div>

@@ -393,12 +393,40 @@ def handle_rideshares(method, event):
             cur.close(); conn.close()
             return resp(200, {'bookings': rows})
 
+        if action == 'my_rideshares':
+            user_id = params.get('user_id')
+            if not user_id:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'user_id обязателен'})
+            cur.execute(f'''
+                SELECT id, route_from, route_to, departure_datetime, seats_total, seats_available,
+                       price_per_seat, car_class, driver_name, driver_phone, driver_telegram, notes, status,
+                       created_by_name, created_by_phone, created_by_user_id, expires_at, created_at
+                FROM {SCHEMA}.rideshares
+                WHERE created_by_user_id = {int(user_id)}
+                ORDER BY created_at DESC
+            ''')
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return resp(200, {'rideshares': rows})
+
         ride_id = params.get('id')
+        is_admin = params.get('admin') == 'true'
         if ride_id:
             cur.execute(f'''
                 SELECT id, route_from, route_to, departure_datetime, seats_total, seats_available,
-                       price_per_seat, car_class, driver_name, driver_phone, driver_telegram, notes, status, created_by_name, created_at
+                       price_per_seat, car_class, driver_name, driver_phone, driver_telegram, notes, status,
+                       created_by_name, created_by_phone, created_by_user_id, expires_at, rideshare_driver_id, created_at
                 FROM {SCHEMA}.rideshares WHERE id={int(ride_id)}
+            ''')
+        elif is_admin:
+            cur.execute(f'''
+                SELECT id, route_from, route_to, departure_datetime, seats_total, seats_available,
+                       price_per_seat, car_class, driver_name, driver_phone, driver_telegram, notes, status,
+                       created_by_name, created_by_phone, created_by_user_id, expires_at, rideshare_driver_id, created_at
+                FROM {SCHEMA}.rideshares
+                ORDER BY created_at DESC
             ''')
         else:
             cur.execute(f'''
@@ -406,6 +434,7 @@ def handle_rideshares(method, event):
                        price_per_seat, car_class, driver_name, notes, status, created_by_name, created_at
                 FROM {SCHEMA}.rideshares
                 WHERE status='active' AND departure_datetime > NOW()
+                AND (expires_at IS NULL OR expires_at > NOW())
                 ORDER BY departure_datetime ASC
             ''')
         cols = [d[0] for d in cur.description]
@@ -439,16 +468,21 @@ def handle_rideshares(method, event):
 
         else:
             seats_total = int(data.get('seats_total', 4))
+            departure_datetime = data.get('departure_datetime')
+            expires_at = data.get('expires_at') or departure_datetime
+            created_by_user_id = int(data.get('created_by_user_id')) if data.get('created_by_user_id') else None
             cur.execute(f'''
                 INSERT INTO {SCHEMA}.rideshares (route_from, route_to, departure_datetime, seats_total, seats_available,
-                  price_per_seat, car_class, driver_name, driver_phone, driver_telegram, notes, status, created_by_name, created_by_phone)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'active',%s,%s) RETURNING id
+                  price_per_seat, car_class, driver_name, driver_phone, driver_telegram, notes, status,
+                  created_by_name, created_by_phone, created_by_user_id, expires_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'active',%s,%s,%s,%s) RETURNING id
             ''', (
-                data.get('route_from'), data.get('route_to'), data.get('departure_datetime'),
+                data.get('route_from'), data.get('route_to'), departure_datetime,
                 seats_total, seats_total, data.get('price_per_seat'),
                 data.get('car_class','comfort'), data.get('driver_name',''),
                 data.get('driver_phone',''), data.get('driver_telegram',''),
-                data.get('notes',''), data.get('created_by_name'), data.get('created_by_phone')
+                data.get('notes',''), data.get('created_by_name'), data.get('created_by_phone'),
+                created_by_user_id, expires_at
             ))
             rid = cur.fetchone()[0]
             conn.commit(); cur.close(); conn.close()
@@ -457,10 +491,50 @@ def handle_rideshares(method, event):
     elif method == 'PUT':
         data = json.loads(event.get('body', '{}'))
         rid = int(data.get('id', 0))
-        status = data.get('status', 'active').replace("'","")
-        cur.execute(f"UPDATE {SCHEMA}.rideshares SET status='{status}', updated_at=CURRENT_TIMESTAMP WHERE id={rid}")
+        set_clauses = []
+        values = []
+        if data.get('status') is not None:
+            set_clauses.append('status=%s')
+            values.append(data.get('status'))
+        if data.get('route_from') is not None:
+            set_clauses.append('route_from=%s')
+            values.append(data.get('route_from'))
+        if data.get('route_to') is not None:
+            set_clauses.append('route_to=%s')
+            values.append(data.get('route_to'))
+        if data.get('departure_datetime') is not None:
+            set_clauses.append('departure_datetime=%s')
+            values.append(data.get('departure_datetime'))
+        if data.get('seats_available') is not None:
+            set_clauses.append('seats_available=%s')
+            values.append(int(data.get('seats_available')))
+        if data.get('price_per_seat') is not None:
+            set_clauses.append('price_per_seat=%s')
+            values.append(data.get('price_per_seat'))
+        if data.get('notes') is not None:
+            set_clauses.append('notes=%s')
+            values.append(data.get('notes'))
+        if data.get('expires_at') is not None:
+            set_clauses.append('expires_at=%s')
+            values.append(data.get('expires_at'))
+        if data.get('rideshare_driver_id') is not None:
+            set_clauses.append('rideshare_driver_id=%s')
+            values.append(int(data.get('rideshare_driver_id')))
+        set_clauses.append('updated_at=CURRENT_TIMESTAMP')
+        values.append(rid)
+        cur.execute(f"UPDATE {SCHEMA}.rideshares SET {', '.join(set_clauses)} WHERE id=%s", values)
         conn.commit(); cur.close(); conn.close()
         return resp(200, {'message': 'Поездка обновлена'})
+
+    elif method == 'DELETE':
+        params = event.get('queryStringParameters', {}) or {}
+        rid = int((params.get('id') or '0'))
+        if not rid:
+            cur.close(); conn.close()
+            return resp(400, {'error': 'id обязателен'})
+        cur.execute(f"DELETE FROM {SCHEMA}.rideshares WHERE id=%s", (rid,))
+        conn.commit(); cur.close(); conn.close()
+        return resp(200, {'message': 'Поездка удалена'})
 
     return resp(405, {'error': 'Method not allowed'})
 

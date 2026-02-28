@@ -391,7 +391,10 @@ const BookingForm = () => {
             ══════════════════════════════════ */}
             <div>
               <FieldLabel>Тип трансфера</FieldLabel>
-              <div className="grid grid-cols-2 gap-3">
+              {/* Mobile: horizontal scroll row. Desktop: auto grid based on count */}
+              <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scroll-smooth -mx-1 px-1 sm:overflow-visible sm:grid sm:pb-0"
+                style={{ gridTemplateColumns: transferTypes.length <= 2 ? `repeat(${transferTypes.length}, 1fr)` : transferTypes.length === 3 ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)' } as React.CSSProperties}
+              >
                 {transferTypes.map(type => {
                   const active = transferType === type.value;
                   return (
@@ -399,25 +402,25 @@ const BookingForm = () => {
                       key={type.value}
                       type="button"
                       onClick={() => handleTransferTypeChange(type.value)}
-                      className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left w-full min-h-[64px] ${
+                      className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all text-center min-h-[88px] min-w-[120px] max-w-[160px] flex-shrink-0 snap-start sm:min-w-0 sm:max-w-none sm:flex-shrink sm:flex-1 ${
                         active
                           ? 'border-primary bg-primary/10'
                           : 'border-border bg-white/40 dark:bg-white/5 hover:border-primary/40'
                       }`}
                     >
                       <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
                           active ? 'gradient-primary' : 'bg-muted'
                         }`}
                       >
                         <Icon
                           name={type.icon as Parameters<typeof Icon>[0]['name']}
-                          className={`h-5 w-5 ${active ? 'text-white' : 'text-muted-foreground'}`}
+                          className={`h-4 w-4 ${active ? 'text-white' : 'text-muted-foreground'}`}
                         />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 w-full">
                         <p className="font-semibold text-sm leading-tight">{type.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{type.description}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{type.description}</p>
                       </div>
                     </button>
                   );
@@ -488,7 +491,7 @@ const BookingForm = () => {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {carClasses.map(cls => {
                   const active = carClass === cls.value;
                   const accent = CLASS_ACCENT[cls.value] ?? CLASS_ACCENT.economy;
@@ -687,7 +690,7 @@ const BookingForm = () => {
                 {/* Payment options */}
                 <div className="border-t border-primary/15 bg-white/30 dark:bg-white/5 p-4 sm:p-5">
                   <p className="text-sm font-semibold mb-3">Способ оплаты</p>
-                  <div className={`grid gap-2 ${canPayByBalance ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+                  <div className={`grid gap-2 ${canPayByBalance ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-3'}`}>
                     <PayOption
                       active={formData.payment_type === 'cash' && !formData.payment_from_balance}
                       onClick={() => setFormData(prev => ({ ...prev, payment_type: 'cash', payment_from_balance: false }))}
@@ -724,38 +727,40 @@ const BookingForm = () => {
               </div>
             )}
 
-            {/* ── Submit button ── */}
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full gradient-primary text-white font-semibold text-base min-h-[54px] hover:opacity-95 transition-opacity"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Icon name="Loader2" className="mr-2 h-5 w-5 animate-spin" />
-                  Отправка...
-                </>
-              ) : isLoggedIn ? (
-                <>
-                  <Icon name="Send" className="mr-2 h-5 w-5" />
-                  Отправить заявку
-                  {formData.price > 0 && (
-                    <span className="ml-2 opacity-80 text-sm">· {fmt(formData.price)} ₽</span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Icon name="LogIn" className="mr-2 h-5 w-5" />
-                  Войти и заказать
-                </>
-              )}
-            </Button>
+            {/* ── Submit button — sticky on mobile ── */}
+            <div className="sticky bottom-0 left-0 right-0 z-20 pb-2 pt-2 -mx-4 px-4 sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:pt-0 bg-white/90 dark:bg-background/90 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-none sm:dark:bg-transparent border-t border-border/50 sm:border-0">
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full gradient-primary text-white font-semibold text-base min-h-[54px] hover:opacity-95 transition-opacity shadow-lg sm:shadow-none"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Icon name="Loader2" className="mr-2 h-5 w-5 animate-spin" />
+                    Отправка...
+                  </>
+                ) : isLoggedIn ? (
+                  <>
+                    <Icon name="Send" className="mr-2 h-5 w-5" />
+                    Отправить заявку
+                    {formData.price > 0 && (
+                      <span className="ml-2 opacity-80 text-sm">· {fmt(formData.price)} ₽</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Icon name="LogIn" className="mr-2 h-5 w-5" />
+                    Войти и заказать
+                  </>
+                )}
+              </Button>
 
-            {/* Required fields note */}
-            <p className="text-center text-xs text-muted-foreground -mt-3">
-              * обязательные поля
-            </p>
+              {/* Required fields note */}
+              <p className="text-center text-xs text-muted-foreground mt-2 sm:mt-0 sm:-mt-3">
+                * обязательные поля
+              </p>
+            </div>
 
           </form>
         </CardContent>

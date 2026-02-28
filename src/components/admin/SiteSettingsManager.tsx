@@ -103,6 +103,14 @@ const SiteSettingsManager = () => {
         <TabsTrigger value="rules">Правила/Политика</TabsTrigger>
         <TabsTrigger value="services">Допуслуги</TabsTrigger>
         <TabsTrigger value="drivers_settings">Водители</TabsTrigger>
+        <TabsTrigger value="telegram">
+          <Icon name="Send" className="mr-1.5 h-3.5 w-3.5" />
+          Telegram
+        </TabsTrigger>
+        <TabsTrigger value="become_driver_content">
+          <Icon name="Car" className="mr-1.5 h-3.5 w-3.5" />
+          Стать водителем
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="seo">
@@ -122,6 +130,25 @@ const SiteSettingsManager = () => {
               <Input value={settings['site_keywords'] || ''} onChange={e => set('site_keywords', e.target.value)} placeholder="трансфер сочи, такси сочи абхазия..." />
             </div>
             <SaveButton keys={['site_title', 'site_description', 'site_keywords']} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Контактная информация сайта</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Ссылка на Telegram-канал / бот</Label>
+              <Input value={settings['site_telegram_url'] || ''} onChange={e => set('site_telegram_url', e.target.value)} placeholder="https://t.me/poehaliplus" />
+            </div>
+            <div>
+              <Label>Телефон для отображения</Label>
+              <Input value={settings['site_phone_display'] || ''} onChange={e => set('site_phone_display', e.target.value)} placeholder="+7 (900) 000-00-00" />
+            </div>
+            <div>
+              <Label>Адрес / регион работы</Label>
+              <Input value={settings['site_address'] || ''} onChange={e => set('site_address', e.target.value)} placeholder="Сочи, Краснодарский край" />
+            </div>
+            <SaveButton keys={['site_telegram_url', 'site_phone_display', 'site_address']} />
           </CardContent>
         </Card>
       </TabsContent>
@@ -354,6 +381,174 @@ const SiteSettingsManager = () => {
                 <Input value={settings['driver_commission_rate'] || '15'} onChange={e => set('driver_commission_rate', e.target.value)} placeholder="15" />
               </div>
               <SaveButton keys={['become_driver_hero_subtitle', 'driver_requirement_list', 'driver_commission_rate']} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Типы водителей</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Тип водителя назначается при регистрации. Трансферные водители берут заказы трансфера. Водители-попутчики создают поездки попутчиков.
+              </p>
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Разрешить регистрацию водителей-попутчиков</p>
+                  <p className="text-xs text-muted-foreground">Водители с типом «rideshare» могут создавать поездки попутчиков</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => set('allow_rideshare_drivers', settings['allow_rideshare_drivers'] === 'true' ? 'false' : 'true')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    settings['allow_rideshare_drivers'] === 'true' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings['allow_rideshare_drivers'] === 'true' ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Разрешить регистрацию трансферных водителей</p>
+                  <p className="text-xs text-muted-foreground">Водители с типом «transfer» могут принимать заказы трансфера</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => set('allow_transfer_drivers', settings['allow_transfer_drivers'] === 'false' ? 'false' : 'true')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    settings['allow_transfer_drivers'] !== 'false' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings['allow_transfer_drivers'] !== 'false' ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+              <SaveButton keys={['allow_rideshare_drivers', 'allow_transfer_drivers']} />
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="telegram">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Telegram-группа</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Ссылка на группу Telegram</Label>
+                <Input value={settings['telegram_group_url'] || ''} onChange={e => set('telegram_group_url', e.target.value)} placeholder="https://t.me/+xxxxx" />
+              </div>
+              <div>
+                <Label>Название группы</Label>
+                <Input value={settings['telegram_group_title'] || ''} onChange={e => set('telegram_group_title', e.target.value)} placeholder="Попутчики ПоехалиПро" />
+              </div>
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Показывать кнопку группы на сайте</p>
+                  <p className="text-xs text-muted-foreground">Отображать ссылку на Telegram-группу в шапке и на страницах</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => set('telegram_group_show', settings['telegram_group_show'] === 'true' ? 'false' : 'true')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    settings['telegram_group_show'] === 'true' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings['telegram_group_show'] === 'true' ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+              <SaveButton keys={['telegram_group_url', 'telegram_group_title', 'telegram_group_show']} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Уведомления в Telegram</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <Icon name="Info" className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Бот настраивается через секреты проекта</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Переменные <code className="bg-muted px-1 rounded text-[11px]">TELEGRAM_BOT_TOKEN</code> и{' '}
+                    <code className="bg-muted px-1 rounded text-[11px]">TELEGRAM_CHAT_ID</code> задаются
+                    в настройках деплоя (secrets). Уведомления о новых заказах и водителях отправляются автоматически при наличии этих переменных.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="become_driver_content">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Заголовок страницы</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Заголовок страницы (Hero title)</Label>
+                <Input value={settings['become_driver_hero_title'] || ''} onChange={e => set('become_driver_hero_title', e.target.value)} placeholder="Станьте водителем ПоехалиПро" />
+              </div>
+              <div>
+                <Label>Подзаголовок (Hero subtitle)</Label>
+                <Input value={settings['become_driver_hero_subtitle'] || ''} onChange={e => set('become_driver_hero_subtitle', e.target.value)} placeholder="Зарабатывайте на своём автомобиле" />
+              </div>
+              <SaveButton keys={['become_driver_hero_title', 'become_driver_hero_subtitle']} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Преимущества</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Текст о заработке</Label>
+                <Textarea value={settings['become_driver_benefit_earnings'] || ''} onChange={e => set('become_driver_benefit_earnings', e.target.value)} rows={2} placeholder="Зарабатывайте от 80 000 ₽ в месяц на своём маршруте" />
+              </div>
+              <div>
+                <Label>Текст о графике</Label>
+                <Textarea value={settings['become_driver_benefit_schedule'] || ''} onChange={e => set('become_driver_benefit_schedule', e.target.value)} rows={2} placeholder="Работайте когда удобно — без фиксированного расписания" />
+              </div>
+              <div>
+                <Label>Текст о поддержке</Label>
+                <Textarea value={settings['become_driver_benefit_support'] || ''} onChange={e => set('become_driver_benefit_support', e.target.value)} rows={2} placeholder="Персональный менеджер и круглосуточная поддержка" />
+              </div>
+              <div>
+                <Label>Текст о страховании</Label>
+                <Textarea value={settings['become_driver_benefit_insurance'] || ''} onChange={e => set('become_driver_benefit_insurance', e.target.value)} rows={2} placeholder="Страховка пассажиров включена в каждую поездку" />
+              </div>
+              <SaveButton keys={['become_driver_benefit_earnings', 'become_driver_benefit_schedule', 'become_driver_benefit_support', 'become_driver_benefit_insurance']} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Шаги подключения</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {[1, 2, 3, 4].map(step => (
+                <div key={step} className="p-3 border rounded-lg space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Шаг {step}</p>
+                  <div>
+                    <Label>Заголовок</Label>
+                    <Input
+                      value={settings[`become_driver_step${step}_title`] || ''}
+                      onChange={e => set(`become_driver_step${step}_title`, e.target.value)}
+                      placeholder={['Регистрация', 'Проверка документов', 'Обучение', 'Первый заказ'][step - 1]}
+                    />
+                  </div>
+                  <div>
+                    <Label>Описание</Label>
+                    <Textarea
+                      value={settings[`become_driver_step${step}_desc`] || ''}
+                      onChange={e => set(`become_driver_step${step}_desc`, e.target.value)}
+                      rows={2}
+                      placeholder={['Заполните анкету и загрузите документы', 'Менеджер проверит данные в течение 24 часов', 'Короткий инструктаж по приложению', 'Получите первый заказ и начните зарабатывать'][step - 1]}
+                    />
+                  </div>
+                </div>
+              ))}
+              <SaveButton keys={['become_driver_step1_title', 'become_driver_step1_desc', 'become_driver_step2_title', 'become_driver_step2_desc', 'become_driver_step3_title', 'become_driver_step3_desc', 'become_driver_step4_title', 'become_driver_step4_desc']} />
             </CardContent>
           </Card>
         </div>

@@ -223,6 +223,38 @@ def handle_users(method, event, params, data, headers):
             uid = cur.fetchone()[0]
             conn.commit(); cur.close(); conn.close()
             return resp(201, {'id': uid, 'message': 'Пользователь создан'})
+        elif action == 'request_reset':
+            phone = data.get('phone', '').strip()
+            if not phone:
+                return resp(400, {'error': 'Телефон обязателен'})
+            import random
+            code = str(random.randint(100000, 999999))
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id FROM {SCHEMA}.users WHERE phone=%s", (phone,))
+            if not cur.fetchone():
+                cur.close(); conn.close(); return resp(404, {'error': 'Пользователь не найден'})
+            cur.execute(f'''
+                INSERT INTO {SCHEMA}.site_settings (key, value) VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value
+            ''', (f'reset_code_{phone}', code))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Код отправлен', 'code': code})
+        elif action == 'confirm_reset':
+            phone = data.get('phone', '').strip()
+            code = data.get('code', '').strip()
+            new_password = data.get('new_password', '')
+            if not phone or not code or not new_password:
+                return resp(400, {'error': 'Телефон, код и новый пароль обязательны'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT value FROM {SCHEMA}.site_settings WHERE key=%s", (f'reset_code_{phone}',))
+            row = cur.fetchone()
+            if not row or row[0] != code:
+                cur.close(); conn.close(); return resp(400, {'error': 'Неверный или истёкший код'})
+            cur.execute(f"UPDATE {SCHEMA}.users SET password_hash=%s,updated_at=NOW() WHERE phone=%s",
+                        (hash_password(new_password), phone))
+            cur.execute(f"DELETE FROM {SCHEMA}.site_settings WHERE key=%s", (f'reset_code_{phone}',))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Пароль изменён'})
     elif method == 'GET':
         action = params.get('action', 'profile')
         if action == 'profile' and user_id:
@@ -305,12 +337,15 @@ def handle_drivers(method, event, params, data, headers):
             cur.execute(f"SELECT id FROM {SCHEMA}.drivers WHERE phone=%s", (phone,))
             if cur.fetchone():
                 cur.close(); conn.close(); return resp(400, {'error': 'Водитель с таким телефоном уже существует'})
+            driver_type = data.get('driver_type', 'transfer')
+            car_category = data.get('car_category', 'sedan')
             cur.execute(f'''
-                INSERT INTO {SCHEMA}.drivers (phone,name,email,password_hash,car_brand,car_model,car_color,car_number,car_number_country,status)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'pending') RETURNING id
+                INSERT INTO {SCHEMA}.drivers (phone,name,email,password_hash,car_brand,car_model,car_color,car_number,car_number_country,status,driver_type,car_category)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'pending',%s,%s) RETURNING id
             ''', (phone, name, data.get('email',''), hash_password(password),
                   data.get('car_brand',''), data.get('car_model',''), data.get('car_color',''),
-                  data.get('car_number',''), data.get('car_number_country','RUS')))
+                  data.get('car_number',''), data.get('car_number_country','RUS'),
+                  driver_type, car_category))
             did = cur.fetchone()[0]
             conn.commit()
             # Загрузка документов (опционально, не блокирует регистрацию)
@@ -347,14 +382,14 @@ def handle_drivers(method, event, params, data, headers):
             phone = data.get('phone','').strip()
             password = data.get('password','')
             conn = get_conn(); cur = conn.cursor()
-            cur.execute(f"SELECT id,name,email,password_hash,is_active,status,balance,commission_rate,rating FROM {SCHEMA}.drivers WHERE phone=%s", (phone,))
+            cur.execute(f"SELECT id,name,email,password_hash,is_active,status,balance,commission_rate,rating,driver_type,car_category FROM {SCHEMA}.drivers WHERE phone=%s", (phone,))
             row = cur.fetchone()
             cur.close(); conn.close()
             if not row: return resp(401, {'error': 'Неверный телефон или пароль'})
-            did, name, email, pwd_hash, is_active, status, balance, commission_rate, rating = row
+            did, name, email, pwd_hash, is_active, status, balance, commission_rate, rating, driver_type, car_category = row
             if hash_password(password) != pwd_hash: return resp(401, {'error': 'Неверный телефон или пароль'})
             token = secrets.token_urlsafe(32)
-            return resp(200, {'token': token, 'driver': {'id': did, 'name': name, 'phone': phone, 'email': email, 'status': status, 'is_active': is_active, 'balance': float(balance or 0), 'commission_rate': float(commission_rate or 15), 'rating': float(rating or 0)}})
+            return resp(200, {'token': token, 'driver': {'id': did, 'name': name, 'phone': phone, 'email': email, 'status': status, 'is_active': is_active, 'balance': float(balance or 0), 'commission_rate': float(commission_rate or 15), 'rating': float(rating or 0), 'driver_type': driver_type or 'transfer', 'car_category': car_category or 'sedan'}})
         elif action == 'set_online' and driver_id:
             conn = get_conn(); cur = conn.cursor()
             cur.execute(f"UPDATE {SCHEMA}.drivers SET is_online=%s WHERE id=%s", (data.get('is_online', False), int(driver_id)))
@@ -377,6 +412,38 @@ def handle_drivers(method, event, params, data, headers):
             cur.execute(f"UPDATE {SCHEMA}.drivers SET total_orders=total_orders+1 WHERE id=%s", (int(driver_id),))
             conn.commit(); cur.close(); conn.close()
             return resp(200, {'message': 'Заказ принят', 'commission': commission, 'driver_amount': driver_amount})
+        elif action == 'request_reset':
+            phone = data.get('phone', '').strip()
+            if not phone:
+                return resp(400, {'error': 'Телефон обязателен'})
+            import random
+            code = str(random.randint(100000, 999999))
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id FROM {SCHEMA}.drivers WHERE phone=%s", (phone,))
+            if not cur.fetchone():
+                cur.close(); conn.close(); return resp(404, {'error': 'Водитель не найден'})
+            cur.execute(f'''
+                INSERT INTO {SCHEMA}.site_settings (key, value) VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value
+            ''', (f'reset_code_driver_{phone}', code))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Код отправлен', 'code': code})
+        elif action == 'confirm_reset':
+            phone = data.get('phone', '').strip()
+            code = data.get('code', '').strip()
+            new_password = data.get('new_password', '')
+            if not phone or not code or not new_password:
+                return resp(400, {'error': 'Телефон, код и новый пароль обязательны'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT value FROM {SCHEMA}.site_settings WHERE key=%s", (f'reset_code_driver_{phone}',))
+            row = cur.fetchone()
+            if not row or row[0] != code:
+                cur.close(); conn.close(); return resp(400, {'error': 'Неверный или истёкший код'})
+            cur.execute(f"UPDATE {SCHEMA}.drivers SET password_hash=%s,updated_at=NOW() WHERE phone=%s",
+                        (hash_password(new_password), phone))
+            cur.execute(f"DELETE FROM {SCHEMA}.site_settings WHERE key=%s", (f'reset_code_driver_{phone}',))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Пароль изменён'})
     elif method == 'GET':
         action = params.get('action', 'profile')
         if action == 'profile' and driver_id:
@@ -385,7 +452,8 @@ def handle_drivers(method, event, params, data, headers):
                 SELECT id,name,phone,email,car_brand,car_model,car_color,car_number,car_number_country,
                        passport_photo_url,license_front_url,license_back_url,
                        car_tech_passport_front_url,car_tech_passport_back_url,car_photos_urls,
-                       status,is_active,is_online,balance,commission_rate,rating,total_orders,created_at
+                       status,is_active,is_online,balance,commission_rate,rating,total_orders,
+                       driver_type,car_category,identity_verified,created_at
                 FROM {SCHEMA}.drivers WHERE id=%s
             ''', (int(driver_id),))
             row = cur.fetchone()
@@ -394,7 +462,8 @@ def handle_drivers(method, event, params, data, headers):
             cols = ['id','name','phone','email','car_brand','car_model','car_color','car_number','car_number_country',
                     'passport_photo_url','license_front_url','license_back_url',
                     'car_tech_passport_front_url','car_tech_passport_back_url','car_photos_urls',
-                    'status','is_active','is_online','balance','commission_rate','rating','total_orders','created_at']
+                    'status','is_active','is_online','balance','commission_rate','rating','total_orders',
+                    'driver_type','car_category','identity_verified','created_at']
             cur.close(); conn.close()
             return resp(200, {'driver': dict(zip(cols, row))})
         elif action == 'orders' and driver_id:
@@ -426,7 +495,7 @@ def handle_drivers(method, event, params, data, headers):
             return resp(200, {'orders': orders})
         elif action == 'list':
             conn = get_conn(); cur = conn.cursor()
-            cur.execute(f"SELECT id,name,phone,email,car_brand,car_model,car_color,car_number,status,is_active,is_online,balance,commission_rate,rating,total_orders,created_at FROM {SCHEMA}.drivers ORDER BY created_at DESC")
+            cur.execute(f"SELECT id,name,phone,email,car_brand,car_model,car_color,car_number,status,is_active,is_online,balance,commission_rate,rating,total_orders,driver_type,car_category,created_at FROM {SCHEMA}.drivers ORDER BY created_at DESC")
             cols = [d[0] for d in cur.description]
             drivers = [dict(zip(cols, r)) for r in cur.fetchall()]
             cur.close(); conn.close()
@@ -439,8 +508,47 @@ def handle_drivers(method, event, params, data, headers):
             did = data_put.get('driver_id')
             status = data_put.get('status', 'approved')
             is_active = status == 'approved'
-            cur.execute(f"UPDATE {SCHEMA}.drivers SET status=%s,is_active=%s,commission_rate=%s,updated_at=NOW() WHERE id=%s",
-                        (status, is_active, float(data_put.get('commission_rate', 15)), int(did)))
+            set_clauses = [
+                'status=%s', 'is_active=%s', 'commission_rate=%s', 'updated_at=NOW()'
+            ]
+            values = [status, is_active, float(data_put.get('commission_rate', 15))]
+            if data_put.get('driver_type') is not None:
+                set_clauses.insert(-1, 'driver_type=%s')
+                values.append(data_put.get('driver_type'))
+            if data_put.get('car_category') is not None:
+                set_clauses.insert(-1, 'car_category=%s')
+                values.append(data_put.get('car_category'))
+            if data_put.get('identity_verified') is not None:
+                set_clauses.insert(-1, 'identity_verified=%s')
+                values.append(data_put.get('identity_verified'))
+            if data_put.get('questionnaire') is not None:
+                set_clauses.insert(-1, 'questionnaire=%s')
+                values.append(json.dumps(data_put.get('questionnaire')))
+            values.append(int(did))
+            cur.execute(f"UPDATE {SCHEMA}.drivers SET {', '.join(set_clauses)} WHERE id=%s", values)
+        elif action == 'update':
+            did = data_put.get('driver_id') or data_put.get('id')
+            set_clauses = ['updated_at=NOW()']
+            values = []
+            for field in ['name', 'phone', 'email', 'car_brand', 'car_model', 'car_color',
+                          'car_number', 'car_number_country', 'status', 'driver_type', 'car_category']:
+                if data_put.get(field) is not None:
+                    set_clauses.insert(-1, f'{field}=%s')
+                    values.append(data_put.get(field))
+            if data_put.get('identity_verified') is not None:
+                set_clauses.insert(-1, 'identity_verified=%s')
+                values.append(data_put.get('identity_verified'))
+            if data_put.get('questionnaire') is not None:
+                set_clauses.insert(-1, 'questionnaire=%s')
+                values.append(json.dumps(data_put.get('questionnaire')))
+            if data_put.get('commission_rate') is not None:
+                set_clauses.insert(-1, 'commission_rate=%s')
+                values.append(float(data_put.get('commission_rate')))
+            if data_put.get('new_password'):
+                set_clauses.insert(-1, 'password_hash=%s')
+                values.append(hash_password(data_put['new_password']))
+            values.append(int(did))
+            cur.execute(f"UPDATE {SCHEMA}.drivers SET {', '.join(set_clauses)} WHERE id=%s", values)
         elif action == 'set_commission':
             cur.execute(f"UPDATE {SCHEMA}.drivers SET commission_rate=%s WHERE id=%s",
                         (float(data_put.get('commission_rate', 15)), int(data_put.get('driver_id'))))

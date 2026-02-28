@@ -19,6 +19,7 @@ import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
 import TransferClassesManager from '@/components/admin/TransferClassesManager';
 import UsersManager from '@/components/admin/UsersManager';
 import ManagersManager from '@/components/admin/ManagersManager';
+import RideshareOrdersManager from '@/components/admin/RideshareOrdersManager';
 
 interface Withdrawal {
   id: number;
@@ -51,7 +52,7 @@ const AdminDashboard = () => {
   const { toast } = useToast();
   const [adminName, setAdminName] = useState('');
   const [adminRole, setAdminRole] = useState('admin');
-  const [stats, setStats] = useState({ totalOrders: 0, newOrders: 0, activeTariffs: 0, activeFleet: 0, pendingDrivers: 0 });
+  const [stats, setStats] = useState({ totalOrders: 0, newOrders: 0, activeTariffs: 0, activeFleet: 0, pendingDrivers: 0, activeRideshares: 0 });
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
 
@@ -68,23 +69,27 @@ const AdminDashboard = () => {
 
   const loadStats = async () => {
     try {
-      const [ordersRes, tariffsRes, fleetRes, driversRes] = await Promise.all([
+      const [ordersRes, tariffsRes, fleetRes, driversRes, ridesharesRes] = await Promise.all([
         fetch(API_URLS.orders),
         fetch(`${API_URLS.tariffs}?active=true`),
         fetch(`${API_URLS.fleet}?active=true`),
-        fetch(`${API_URLS.drivers}&action=list`)
+        fetch(`${API_URLS.drivers}&action=list`),
+        fetch('https://functions.poehali.dev/bb30d9f0-aad2-4e73-a102-04fb8211f7ae?resource=rideshares&admin=true')
       ]);
       const ordersData = await ordersRes.json();
       const tariffsData = await tariffsRes.json();
       const fleetData = await fleetRes.json();
       const driversData = await driversRes.json();
+      const ridesharesData = await ridesharesRes.json();
       const pending = (driversData.drivers || []).filter((d: { status: string }) => d.status === 'pending').length;
+      const activeRideshares = (ridesharesData.rideshares || []).filter((r: { status: string }) => r.status === 'active').length;
       setStats({
         totalOrders: ordersData.orders?.length || 0,
         newOrders: ordersData.orders?.filter((o: { status_id: number }) => o.status_id === 1).length || 0,
         activeTariffs: tariffsData.tariffs?.length || 0,
         activeFleet: fleetData.fleet?.length || 0,
-        pendingDrivers: pending
+        pendingDrivers: pending,
+        activeRideshares
       });
     } catch { /* silent */ }
   };
@@ -165,13 +170,14 @@ const AdminDashboard = () => {
       </nav>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
           {[
             { icon: 'ShoppingCart', label: 'Всего заявок', value: stats.totalOrders },
             { icon: 'AlertCircle', label: 'Новых', value: stats.newOrders },
             { icon: 'MapPin', label: 'Тарифов', value: stats.activeTariffs },
             { icon: 'Car', label: 'Авто', value: stats.activeFleet },
-            { icon: 'Users', label: 'На проверке', value: stats.pendingDrivers }
+            { icon: 'Users', label: 'На проверке', value: stats.pendingDrivers },
+            { icon: 'Users2', label: 'Попутчики', value: stats.activeRideshares }
           ].map((stat, idx) => (
             <Card key={idx} className="hover:shadow-lg transition-all">
               <CardContent className="p-4">
@@ -189,12 +195,21 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        <Tabs defaultValue="orders" className="space-y-4">
+        <Tabs defaultValue="transfer_orders" className="space-y-4">
           <div className="overflow-x-auto">
             <TabsList className="inline-flex min-w-max gap-0">
-              <TabsTrigger value="orders">
+              <TabsTrigger value="transfer_orders">
                 <Icon name="ShoppingCart" className="mr-1.5 h-4 w-4" />
-                Заявки
+                Трансферы
+              </TabsTrigger>
+              <TabsTrigger value="rideshares">
+                <Icon name="Users2" className="mr-1.5 h-4 w-4" />
+                Попутчики
+                {stats.activeRideshares > 0 && (
+                  <span className="ml-1 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                    {stats.activeRideshares}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger value="drivers">
                 <Icon name="Users" className="mr-1.5 h-4 w-4" />
@@ -257,8 +272,12 @@ const AdminDashboard = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="orders">
+          <TabsContent value="transfer_orders">
             <OrdersManager onUpdate={loadStats} />
+          </TabsContent>
+
+          <TabsContent value="rideshares">
+            <RideshareOrdersManager />
           </TabsContent>
 
           <TabsContent value="drivers">
