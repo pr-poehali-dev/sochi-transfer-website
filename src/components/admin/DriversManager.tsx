@@ -42,7 +42,15 @@ const DriversManager = () => {
   const [commission, setCommission] = useState('15');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { loadDrivers(); }, []);
+  const [addDialog, setAddDialog] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', phone: '', email: '', password: 'driver123', car_brand: '', car_model: '', car_color: '', car_number: '' });
+  const [addLoading, setAddLoading] = useState(false);
+
+  const [limitDialog, setLimitDialog] = useState(false);
+  const [regLimit, setRegLimit] = useState('');
+  const [regEnabled, setRegEnabled] = useState(true);
+
+  useEffect(() => { loadDrivers(); loadLimit(); }, []);
 
   const loadDrivers = async () => {
     setLoading(true);
@@ -52,6 +60,28 @@ const DriversManager = () => {
       setDrivers(data.drivers || []);
     } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
     finally { setLoading(false); }
+  };
+
+  const loadLimit = async () => {
+    try {
+      const r = await fetch(API_URLS.settings);
+      const d = await r.json();
+      const s = d.settings || {};
+      setRegLimit(s['driver_registration_limit'] || '');
+      setRegEnabled(s['driver_registration_enabled'] !== 'false');
+    } catch { /* silent */ }
+  };
+
+  const saveLimit = async () => {
+    try {
+      await fetch(API_URLS.settings, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { driver_registration_limit: regLimit, driver_registration_enabled: String(regEnabled) } })
+      });
+      toast({ title: 'Настройки регистрации сохранены' });
+      setLimitDialog(false);
+    } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
   };
 
   const openDriver = (d: Driver) => {
@@ -86,18 +116,53 @@ const DriversManager = () => {
     loadDrivers();
   };
 
+  const addDriver = async () => {
+    if (!addForm.name || !addForm.phone) {
+      toast({ title: 'Укажите имя и телефон', variant: 'destructive' }); return;
+    }
+    setAddLoading(true);
+    try {
+      const r = await fetch(API_URLS.drivers, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'admin_create', ...addForm })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Ошибка');
+      toast({ title: `Водитель создан! Пароль: ${d.password || addForm.password}` });
+      setAddDialog(false);
+      setAddForm({ name: '', phone: '', email: '', password: 'driver123', car_brand: '', car_model: '', car_color: '', car_number: '' });
+      loadDrivers();
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
+    }
+    setAddLoading(false);
+  };
+
   const pendingCount = drivers.filter(d => d.status === 'pending').length;
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Водители
-            {pendingCount > 0 && (
-              <Badge className="bg-yellow-500 text-white">{pendingCount} на проверке</Badge>
-            )}
-          </CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="flex items-center gap-2">
+              Водители
+              {pendingCount > 0 && (
+                <Badge className="bg-yellow-500 text-white">{pendingCount} на проверке</Badge>
+              )}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setLimitDialog(true)}>
+                <Icon name="Settings" className="h-4 w-4 mr-1" />
+                Лимит регистрации
+              </Button>
+              <Button size="sm" className="gradient-primary text-white" onClick={() => setAddDialog(true)}>
+                <Icon name="Plus" className="h-4 w-4 mr-1" />
+                Добавить
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -110,7 +175,7 @@ const DriversManager = () => {
                 <div key={d.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 cursor-pointer transition-colors"
                   onClick={() => openDriver(d)}>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-medium">{d.name}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_LABELS[d.status]?.color || 'bg-gray-100 text-gray-800'}`}>
                         {STATUS_LABELS[d.status]?.label || d.status}
@@ -132,6 +197,7 @@ const DriversManager = () => {
         </CardContent>
       </Card>
 
+      {/* Диалог детального просмотра водителя */}
       <Dialog open={!!selected} onOpenChange={v => !v && setSelected(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -182,6 +248,93 @@ const DriversManager = () => {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог добавления водителя */}
+      <Dialog open={addDialog} onOpenChange={setAddDialog}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Добавить водителя</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label>Имя *</Label>
+                <Input className="mt-1" placeholder="Иван Иванов" value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="col-span-2">
+                <Label>Телефон *</Label>
+                <Input className="mt-1" placeholder="+7 (900) 000-00-00" value={addForm.phone} onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="col-span-2">
+                <Label>Email</Label>
+                <Input className="mt-1" type="email" placeholder="driver@mail.ru" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="col-span-2">
+                <Label>Пароль</Label>
+                <Input className="mt-1" value={addForm.password} onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Марка авто</Label>
+                <Input className="mt-1" placeholder="Toyota" value={addForm.car_brand} onChange={e => setAddForm(f => ({ ...f, car_brand: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Модель</Label>
+                <Input className="mt-1" placeholder="Camry" value={addForm.car_model} onChange={e => setAddForm(f => ({ ...f, car_model: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Цвет</Label>
+                <Input className="mt-1" placeholder="Белый" value={addForm.car_color} onChange={e => setAddForm(f => ({ ...f, car_color: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Гос. номер</Label>
+                <Input className="mt-1" placeholder="А123ВС123" value={addForm.car_number} onChange={e => setAddForm(f => ({ ...f, car_number: e.target.value }))} />
+              </div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
+              Водитель будет сразу активирован (статус "Активен").
+            </div>
+            <Button className="w-full gradient-primary text-white" onClick={addDriver} disabled={addLoading}>
+              {addLoading ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
+              Создать водителя
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог лимита регистрации */}
+      <Dialog open={limitDialog} onOpenChange={setLimitDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Лимит регистрации водителей</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 border rounded-lg">
+              <button
+                onClick={() => setRegEnabled(!regEnabled)}
+                className={`relative w-10 h-6 rounded-full transition-colors ${regEnabled ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${regEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+              </button>
+              <div>
+                <p className="text-sm font-medium">{regEnabled ? 'Регистрация открыта' : 'Регистрация закрыта'}</p>
+                <p className="text-xs text-muted-foreground">Разрешить новым водителям регистрироваться</p>
+              </div>
+            </div>
+            <div>
+              <Label>Максимальное количество водителей</Label>
+              <Input className="mt-1" type="number" min="0" placeholder="0 — без лимита" value={regLimit}
+                onChange={e => setRegLimit(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">0 или пусто — без ограничений</p>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Сейчас зарегистрировано: <strong>{drivers.length}</strong> водителей
+            </div>
+            <Button className="w-full gradient-primary text-white" onClick={saveLimit}>
+              Сохранить настройки
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

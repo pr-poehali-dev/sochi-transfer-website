@@ -230,13 +230,13 @@ const BookingForm = () => {
   return (
     <>
       <Card className="max-w-2xl mx-auto glass-effect border-white/40 shadow-2xl animate-scale-in">
-        <CardContent className="p-8">
+        <CardContent className="p-4 sm:p-8">
           {!isLoggedIn && (
-            <div className="mb-5 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center gap-3">
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center gap-2">
               <Icon name="AlertCircle" className="h-5 w-5 text-yellow-600 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-yellow-800">Для оформления заказа нужен аккаунт</p>
-                <p className="text-xs text-yellow-600">Войдите или зарегистрируйтесь бесплатно</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-yellow-800">Нужен аккаунт для заказа</p>
+                <p className="text-xs text-yellow-600 hidden sm:block">Войдите или зарегистрируйтесь бесплатно</p>
               </div>
               <Button size="sm" className="gradient-primary text-white flex-shrink-0" onClick={() => navigate('/auth')}>
                 Войти
@@ -424,7 +424,7 @@ const BookingForm = () => {
                 </div>
                 <div className="border-t pt-3 space-y-2">
                   <p className="text-sm font-semibold mb-2">Способ оплаты</p>
-                  <div className={`grid gap-2 ${canPayByBalance ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
+                  <div className={`grid gap-2 ${canPayByBalance ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, payment_type: 'cash', payment_from_balance: false }))}

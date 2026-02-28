@@ -199,13 +199,42 @@ def handle_drivers(method, event, params, data, headers):
     driver_id = headers.get('X-Driver-Id') or params.get('driver_id')
     if method == 'POST':
         action = data.get('action', 'register')
-        if action == 'register':
+        if action == 'admin_create':
+            phone = data.get('phone', '').strip()
+            name = data.get('name', '').strip()
+            password = data.get('password', 'driver123')
+            if not phone or not name:
+                return resp(400, {'error': 'Телефон и имя обязательны'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id FROM {SCHEMA}.drivers WHERE phone=%s", (phone,))
+            if cur.fetchone():
+                cur.close(); conn.close(); return resp(400, {'error': 'Водитель с таким телефоном уже существует'})
+            cur.execute(f'''
+                INSERT INTO {SCHEMA}.drivers (phone,name,email,password_hash,car_brand,car_model,car_color,car_number,car_number_country,status,is_active)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'approved',true) RETURNING id
+            ''', (phone, name, data.get('email',''), hash_password(password),
+                  data.get('car_brand',''), data.get('car_model',''), data.get('car_color',''),
+                  data.get('car_number',''), data.get('car_number_country','RUS')))
+            did = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            return resp(201, {'id': did, 'message': 'Водитель создан', 'password': password})
+        elif action == 'register':
             phone = data.get('phone', '').strip()
             name = data.get('name', '').strip()
             password = data.get('password', '')
             if not phone or not name or not password:
                 return resp(400, {'error': 'Телефон, имя и пароль обязательны'})
             conn = get_conn(); cur = conn.cursor()
+            # Проверка лимита регистрации
+            cur.execute(f"SELECT value FROM {SCHEMA}.site_settings WHERE key='driver_registration_limit'")
+            limit_row = cur.fetchone()
+            if limit_row and limit_row[0] and limit_row[0] != '0' and limit_row[0] != '':
+                limit = int(limit_row[0])
+                cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.drivers")
+                total = cur.fetchone()[0]
+                if total >= limit:
+                    cur.close(); conn.close()
+                    return resp(400, {'error': f'Регистрация временно закрыта. Достигнут лимит водителей ({limit})'})
             cur.execute(f"SELECT id FROM {SCHEMA}.drivers WHERE phone=%s", (phone,))
             if cur.fetchone():
                 cur.close(); conn.close(); return resp(400, {'error': 'Водитель с таким телефоном уже существует'})

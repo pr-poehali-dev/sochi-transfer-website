@@ -228,58 +228,53 @@ const PassengerCabinet = () => {
   if (!isAuth) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="flex items-center gap-2 mb-8 cursor-pointer justify-center" onClick={() => navigate('/')}>
+        <div className="w-full max-w-sm">
+          <div className="flex items-center gap-2 mb-6 cursor-pointer justify-center" onClick={() => navigate('/')}>
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
               <Icon name="Users" className="h-4 w-4 text-white" />
             </div>
-            <span className="font-bold text-gradient text-xl">Попутчики</span>
+            <span className="font-bold text-gradient text-lg">Попутчики</span>
           </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>{authMode === 'login' ? 'Вход' : 'Регистрация'}</CardTitle>
-              <CardDescription>
-                {authMode === 'login' ? 'Войдите чтобы найти попутчиков или предложить поездку' : 'Создайте аккаунт для попутчиков'}
-              </CardDescription>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl">{authMode === 'login' ? 'Вход' : 'Регистрация'}</CardTitle>
+              <CardDescription>{authMode === 'login' ? 'Войдите в аккаунт' : 'Создайте новый аккаунт'}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               {authMode === 'register' && (
                 <div>
-                  <Label>Имя <span className="text-red-500">*</span></Label>
-                  <Input placeholder="Иван Иванов" value={authForm.name} onChange={e => setAuthForm(f => ({ ...f, name: e.target.value }))} />
+                  <Label className="text-sm">Ваше имя</Label>
+                  <Input className="mt-1" placeholder="Иван Иванов" value={authForm.name} onChange={e => setAuthForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
               )}
               <div>
-                <Label>Телефон <span className="text-red-500">*</span></Label>
-                <Input placeholder="+7 (900) 000-00-00" value={authForm.phone} onChange={e => setAuthForm(f => ({ ...f, phone: e.target.value }))} />
+                <Label className="text-sm">Телефон</Label>
+                <Input className="mt-1" placeholder="+7 (900) 000-00-00" value={authForm.phone} onChange={e => setAuthForm(f => ({ ...f, phone: e.target.value }))} />
               </div>
               <div>
-                <Label>Пароль <span className="text-red-500">*</span></Label>
-                <Input type="password" placeholder="Минимум 6 символов" value={authForm.password} onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))} />
+                <Label className="text-sm">Пароль</Label>
+                <Input className="mt-1" type="password" placeholder="Минимум 6 символов" value={authForm.password} onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))} />
               </div>
               {authMode === 'register' && (
                 <div>
-                  <Label>Повторите пароль <span className="text-red-500">*</span></Label>
-                  <Input type="password" placeholder="Повторите пароль" value={authForm.password2} onChange={e => setAuthForm(f => ({ ...f, password2: e.target.value }))} />
+                  <Label className="text-sm">Повторите пароль</Label>
+                  <Input className="mt-1" type="password" placeholder="Повторите пароль" value={authForm.password2} onChange={e => setAuthForm(f => ({ ...f, password2: e.target.value }))} />
                 </div>
               )}
-              <Button className="w-full gradient-primary text-white" onClick={handleAuth} disabled={authLoading}>
-                {authLoading && <Icon name="Loader2" className="mr-2 h-4 w-4 animate-spin" />}
-                {authMode === 'login' ? 'Войти' : 'Зарегистрироваться'}
+              <Button className="w-full gradient-primary text-white mt-2" onClick={handleAuth} disabled={authLoading}>
+                {authLoading ? <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" /> : null}
+                {authMode === 'login' ? 'Войти' : 'Создать аккаунт'}
               </Button>
-              <p className="text-center text-sm text-muted-foreground">
-                {authMode === 'login' ? (
-                  <>Нет аккаунта? <button className="text-primary font-medium" onClick={() => setAuthMode('register')}>Зарегистрироваться</button></>
-                ) : (
-                  <>Уже есть аккаунт? <button className="text-primary font-medium" onClick={() => setAuthMode('login')}>Войти</button></>
-                )}
-              </p>
-              <div className="text-center">
-                <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => navigate('/')}>
-                  ← Вернуться на главную
+              <p className="text-center text-sm text-muted-foreground pt-1">
+                {authMode === 'login' ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
+                <button className="text-primary underline font-medium" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
+                  {authMode === 'login' ? 'Зарегистрироваться' : 'Войти'}
                 </button>
-              </div>
+              </p>
+              <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => navigate('/')}>
+                <Icon name="ArrowLeft" className="h-4 w-4 mr-1" /> На главную
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -289,274 +284,249 @@ const PassengerCabinet = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-      <div className="bg-white/80 backdrop-blur border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      {/* Шапка */}
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Icon name="Users" className="h-4 w-4 text-white" />
+            <div className="w-7 h-7 rounded-lg gradient-primary flex items-center justify-center">
+              <Icon name="Users" className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-bold text-gradient">Попутчики</span>
+            <span className="font-bold text-gradient text-sm">Попутчики</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:block">Привет, {userName}!</span>
-            <Button size="sm" variant="outline" onClick={logout}>
-              <Icon name="LogOut" className="h-4 w-4 mr-1" />
-              Выйти
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:block">{userName}</span>
+            <Button variant="ghost" size="sm" onClick={logout}>
+              <Icon name="LogOut" className="h-4 w-4" />
             </Button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-4 max-w-2xl">
+        {/* Кнопка предложить поездку */}
+        <Button className="w-full gradient-primary text-white mb-4 h-12 text-base" onClick={() => setCreateDialog(true)}>
+          <Icon name="Plus" className="h-5 w-5 mr-2" />
+          Предложить поездку
+        </Button>
+
         <Tabs defaultValue="find">
-          <TabsList className="mb-6 w-full sm:w-auto">
-            <TabsTrigger value="find">
-              <Icon name="Search" className="h-4 w-4 mr-2" />
-              Найти поездку
-            </TabsTrigger>
-            <TabsTrigger value="offer">
-              <Icon name="Plus" className="h-4 w-4 mr-2" />
-              Предложить поездку
-            </TabsTrigger>
-            <TabsTrigger value="mybookings">
-              <Icon name="Ticket" className="h-4 w-4 mr-2" />
-              Мои бронирования
+          <TabsList className="w-full mb-4">
+            <TabsTrigger value="find" className="flex-1 text-xs sm:text-sm">Найти поездку</TabsTrigger>
+            <TabsTrigger value="bookings" className="flex-1 text-xs sm:text-sm">
+              Мои брони {myBookings.length > 0 && `(${myBookings.length})`}
             </TabsTrigger>
           </TabsList>
 
-          {/* НАЙТИ ПОЕЗДКУ */}
+          {/* Найти поездку */}
           <TabsContent value="find">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">Доступные поездки</h2>
-                <Button variant="outline" size="sm" onClick={loadData}>
-                  <Icon name="RefreshCw" className="h-4 w-4 mr-1" />
-                  Обновить
-                </Button>
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
               </div>
-
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : rides.length === 0 ? (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <Icon name="Car" className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">Нет доступных поездок</p>
-                    <p className="text-sm text-muted-foreground mt-1">Предложите свою поездку или заходите позже</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                rides.map(ride => (
-                  <Card key={ride.id} className="hover:shadow-md transition-shadow">
+            ) : rides.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Icon name="Car" className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">Нет доступных поездок</p>
+                  <p className="text-sm text-muted-foreground mt-1">Предложите свою поездку первым!</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {rides.map(ride => (
+                  <Card key={ride.id} className="overflow-hidden">
                     <CardContent className="p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Icon name="MapPin" className="h-4 w-4 text-primary shrink-0" />
-                            <span className="font-semibold">{ride.route_from} → {ride.route_to}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Icon name="Calendar" className="h-3.5 w-3.5" />
-                              {formatDate(ride.departure_datetime)}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Icon name="Users" className="h-3.5 w-3.5" />
-                              {ride.seats_available} из {ride.seats_total} мест
-                            </span>
-                            <Badge variant="outline">{CAR_CLASS_LABELS[ride.car_class] || ride.car_class}</Badge>
-                          </div>
-                          {ride.driver_name && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Icon name="User" className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span>{ride.driver_name}</span>
-                              {ride.driver_phone && (
-                                <a href={`tel:${ride.driver_phone}`} className="text-primary text-xs">
-                                  {ride.driver_phone}
-                                </a>
-                              )}
-                            </div>
-                          )}
-                          {ride.notes && <p className="text-sm text-muted-foreground italic">{ride.notes}</p>}
+                      {/* Маршрут */}
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="flex flex-col items-center pt-1">
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                          <div className="w-0.5 h-6 bg-muted-foreground/30 my-1" />
+                          <div className="w-2 h-2 rounded-full bg-red-500" />
                         </div>
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                          <p className="text-2xl font-bold text-gradient">
-                            {ride.price_per_seat > 0 ? `${ride.price_per_seat} ₽` : 'Бесплатно'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">за место</p>
-                          <Button
-                            size="sm"
-                            className="gradient-primary text-white"
-                            disabled={ride.seats_available === 0}
-                            onClick={() => { setSelectedRide(ride); setBookDialog(true); }}
-                          >
-                            {ride.seats_available === 0 ? 'Мест нет' : 'Забронировать'}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{ride.route_from}</p>
+                          <p className="text-sm text-muted-foreground truncate mt-2">{ride.route_to}</p>
+                        </div>
+                      </div>
+
+                      {/* Детали */}
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
+                        <div className="flex items-center gap-1">
+                          <Icon name="Calendar" className="h-3 w-3" />
+                          <span>{formatDate(ride.departure_datetime)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Icon name="Users" className="h-3 w-3" />
+                          <span>{ride.seats_available} мест</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Icon name="Car" className="h-3 w-3" />
+                          <span>{CAR_CLASS_LABELS[ride.car_class] || ride.car_class}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Icon name="User" className="h-3 w-3" />
+                          <span className="truncate">{ride.created_by_name || 'Водитель'}</span>
+                        </div>
+                      </div>
+
+                      {ride.notes && (
+                        <p className="text-xs text-muted-foreground bg-muted/50 rounded p-2 mb-3">{ride.notes}</p>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-primary text-lg">
+                          {ride.price_per_seat > 0 ? `${ride.price_per_seat} ₽/чел` : 'Договорная'}
+                        </span>
+                        <Button
+                          size="sm"
+                          className="gradient-primary text-white"
+                          disabled={ride.seats_available === 0}
+                          onClick={() => { setSelectedRide(ride); setBookDialog(true); }}
+                        >
+                          {ride.seats_available === 0 ? 'Нет мест' : 'Забронировать'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Мои бронирования */}
+          <TabsContent value="bookings">
+            {myBookings.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Icon name="Ticket" className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">У вас нет бронирований</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {myBookings.map(b => (
+                  <Card key={b.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{b.route_from} → {b.route_to}</p>
+                          {b.departure_datetime && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{formatDate(b.departure_datetime)}</p>
+                          )}
+                        </div>
+                        <Badge variant={b.status === 'confirmed' ? 'default' : b.status === 'cancelled' ? 'destructive' : 'secondary'}
+                          className="text-xs flex-shrink-0">
+                          {b.status === 'confirmed' ? 'Подтверждено' : b.status === 'cancelled' ? 'Отменено' : 'Ожидание'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          {b.seats_count} мест · {b.price_per_seat ? `${b.price_per_seat * b.seats_count} ₽` : 'Договорная'}
+                        </div>
+                        {b.cancel_token && b.status !== 'cancelled' && (
+                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => cancelBooking(b.cancel_token!)}>
+                            Отменить
                           </Button>
-                        </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
-                ))
-              )}
-            </div>
-          </TabsContent>
-
-          {/* ПРЕДЛОЖИТЬ ПОЕЗДКУ */}
-          <TabsContent value="offer">
-            <Card>
-              <CardHeader>
-                <CardTitle>Предложить поездку</CardTitle>
-                <CardDescription>Создайте объявление и найдите попутчиков</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Откуда <span className="text-red-500">*</span></Label>
-                    <Input placeholder="Сочи, аэропорт..." value={createForm.route_from} onChange={e => setCreateForm(f => ({ ...f, route_from: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Куда <span className="text-red-500">*</span></Label>
-                    <Input placeholder="Сухуми, Гагра..." value={createForm.route_to} onChange={e => setCreateForm(f => ({ ...f, route_to: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Дата и время <span className="text-red-500">*</span></Label>
-                    <Input type="datetime-local" value={createForm.departure_datetime} onChange={e => setCreateForm(f => ({ ...f, departure_datetime: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Цена за место (₽)</Label>
-                    <Input type="number" placeholder="500" value={createForm.price_per_seat} onChange={e => setCreateForm(f => ({ ...f, price_per_seat: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Мест в машине</Label>
-                    <Input type="number" min="1" max="10" value={createForm.seats_total} onChange={e => setCreateForm(f => ({ ...f, seats_total: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Класс авто</Label>
-                    <select
-                      className="w-full h-10 px-3 border rounded-md text-sm"
-                      value={createForm.car_class}
-                      onChange={e => setCreateForm(f => ({ ...f, car_class: e.target.value }))}
-                    >
-                      {Object.entries(CAR_CLASS_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <Label>Комментарий</Label>
-                  <Textarea placeholder="Дополнительная информация о поездке..." value={createForm.notes} onChange={e => setCreateForm(f => ({ ...f, notes: e.target.value }))} rows={3} />
-                </div>
-                <Button className="w-full gradient-primary text-white" onClick={createRide}>
-                  <Icon name="Plus" className="mr-2 h-4 w-4" />
-                  Опубликовать поездку
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* МОИ БРОНИРОВАНИЯ */}
-          <TabsContent value="mybookings">
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold">Мои бронирования</h2>
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : myBookings.length === 0 ? (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <Icon name="Ticket" className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">Нет бронирований</p>
-                    <p className="text-sm text-muted-foreground mt-1">Забронируйте место в доступных поездках</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                myBookings.map(booking => (
-                  <Card key={booking.id}>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="space-y-1">
-                          {booking.route_from && (
-                            <p className="font-semibold flex items-center gap-1">
-                              <Icon name="MapPin" className="h-4 w-4 text-primary" />
-                              {booking.route_from} → {booking.route_to}
-                            </p>
-                          )}
-                          {booking.departure_datetime && (
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Icon name="Calendar" className="h-3.5 w-3.5" />
-                              {formatDate(booking.departure_datetime)}
-                            </p>
-                          )}
-                          <p className="text-sm">Мест: <strong>{booking.seats_count}</strong></p>
-                          {booking.price_per_seat && (
-                            <p className="text-sm">Итого: <strong>{booking.seats_count * booking.price_per_seat} ₽</strong></p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            Забронировано: {new Date(booking.created_at).toLocaleDateString('ru')}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                          <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}
-                            className={booking.status === 'confirmed' ? 'bg-green-500 text-white' : ''}>
-                            {booking.status === 'confirmed' ? 'Подтверждено' :
-                             booking.status === 'cancelled' ? 'Отменено' : 'Ожидание'}
-                          </Badge>
-                          {booking.status === 'confirmed' && booking.cancel_token && (
-                            <Button size="sm" variant="outline" className="text-destructive border-destructive"
-                              onClick={() => cancelBooking(booking.cancel_token!)}>
-                              Отменить
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Book Dialog */}
+      {/* Диалог создания поездки */}
+      <Dialog open={createDialog} onOpenChange={setCreateDialog}>
+        <DialogContent className="max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Предложить поездку</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm">Откуда</Label>
+              <Input className="mt-1" placeholder="Сочи, аэропорт" value={createForm.route_from}
+                onChange={e => setCreateForm(f => ({ ...f, route_from: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-sm">Куда</Label>
+              <Input className="mt-1" placeholder="Гагра, Пицунда..." value={createForm.route_to}
+                onChange={e => setCreateForm(f => ({ ...f, route_to: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-sm">Дата и время</Label>
+              <Input className="mt-1" type="datetime-local" value={createForm.departure_datetime}
+                onChange={e => setCreateForm(f => ({ ...f, departure_datetime: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Мест</Label>
+                <Input className="mt-1" type="number" min="1" max="8" value={createForm.seats_total}
+                  onChange={e => setCreateForm(f => ({ ...f, seats_total: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-sm">Цена/чел (₽)</Label>
+                <Input className="mt-1" type="number" min="0" placeholder="0" value={createForm.price_per_seat}
+                  onChange={e => setCreateForm(f => ({ ...f, price_per_seat: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm">Класс авто</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                {Object.entries(CAR_CLASS_LABELS).map(([v, l]) => (
+                  <button key={v} onClick={() => setCreateForm(f => ({ ...f, car_class: v }))}
+                    className={`text-sm py-2 px-3 rounded-lg border transition-colors ${createForm.car_class === v ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted/50'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm">Комментарий</Label>
+              <Textarea className="mt-1" placeholder="Дополнительная информация..." rows={2} value={createForm.notes}
+                onChange={e => setCreateForm(f => ({ ...f, notes: e.target.value }))} />
+            </div>
+            <Button className="w-full gradient-primary text-white" onClick={createRide}>
+              Создать поездку
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог бронирования */}
       <Dialog open={bookDialog} onOpenChange={setBookDialog}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm mx-4">
           <DialogHeader>
             <DialogTitle>Забронировать место</DialogTitle>
           </DialogHeader>
           {selectedRide && (
             <div className="space-y-4">
-              <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
-                <p className="font-semibold">{selectedRide.route_from} → {selectedRide.route_to}</p>
+              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                <p className="font-medium">{selectedRide.route_from} → {selectedRide.route_to}</p>
                 <p className="text-muted-foreground">{formatDate(selectedRide.departure_datetime)}</p>
-                <p>Доступно мест: <strong>{selectedRide.seats_available}</strong></p>
-                {selectedRide.price_per_seat > 0 && (
-                  <p>Цена: <strong>{selectedRide.price_per_seat} ₽/место</strong></p>
-                )}
+                <p className="text-muted-foreground">Доступно мест: {selectedRide.seats_available}</p>
               </div>
               <div>
-                <Label>Количество мест</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max={selectedRide.seats_available}
+                <Label className="text-sm">Количество мест</Label>
+                <Input className="mt-1" type="number" min="1" max={selectedRide.seats_available}
                   value={bookForm.seats_count}
-                  onChange={e => setBookForm({ seats_count: e.target.value })}
-                />
+                  onChange={e => setBookForm({ seats_count: e.target.value })} />
               </div>
               {selectedRide.price_per_seat > 0 && (
-                <p className="text-sm font-semibold">
-                  Итого: {parseInt(bookForm.seats_count || '1') * selectedRide.price_per_seat} ₽
-                </p>
+                <div className="flex items-center justify-between font-bold text-lg">
+                  <span>Итого:</span>
+                  <span className="text-primary">{selectedRide.price_per_seat * parseInt(bookForm.seats_count || '1')} ₽</span>
+                </div>
               )}
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setBookDialog(false)}>Отмена</Button>
-                <Button className="flex-1 gradient-primary text-white" onClick={bookRide}>Забронировать</Button>
+              <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                <Icon name="Info" className="h-3 w-3 inline mr-1" />
+                Контактные данные будут переданы организатору поездки
               </div>
+              <Button className="w-full gradient-primary text-white" onClick={bookRide}>
+                Подтвердить бронирование
+              </Button>
             </div>
           )}
         </DialogContent>

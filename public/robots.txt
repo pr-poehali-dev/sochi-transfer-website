@@ -1,14 +1,23 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/login
+Disallow: /driver/cabinet
+Disallow: /profile
+
+Sitemap: https://transfer-abkhazia.ru/sitemap.xml
+
 User-agent: Googlebot
 Allow: /
+Disallow: /admin
+Disallow: /driver/cabinet
+Disallow: /profile
+
+User-agent: Yandex
+Allow: /
+Disallow: /admin
+Disallow: /driver/cabinet
+Disallow: /profile
 
 User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: *
 Allow: /

@@ -47,20 +47,21 @@ const Index = () => {
   }, [settings]);
 
   const loadAll = async () => {
-    try {
-      const [tariffsRes, fleetRes, reviewsRes, newsRes, settingsRes] = await Promise.all([
-        fetch(`${API_URLS.tariffs}?active=true`),
-        fetch(`${API_URLS.fleet}?active=true`),
-        fetch(`${API_URLS.reviews}&action=approved`),
-        fetch(API_URLS.news),
-        fetch(API_URLS.settings)
-      ]);
-      const td = await tariffsRes.json(); setTariffs(td.tariffs || []);
-      const fd = await fleetRes.json(); setFleet(fd.fleet || []);
-      const rd = await reviewsRes.json(); setReviews(rd.reviews || []);
-      const nd = await newsRes.json(); setNews(nd.news || []);
-      const sd = await settingsRes.json(); setSettings(sd.settings || {});
-    } catch { /* silent */ }
+    const safe = async (url: string) => {
+      try { const r = await fetch(url); return await r.json(); } catch { return {}; }
+    };
+    const [td, fd, rd, nd, sd] = await Promise.all([
+      safe(`${API_URLS.tariffs}?active=true`),
+      safe(`${API_URLS.fleet}?active=true`),
+      safe(`${API_URLS.reviews}&action=approved`),
+      safe(API_URLS.news),
+      safe(API_URLS.settings),
+    ]);
+    setTariffs(td.tariffs || []);
+    setFleet(fd.fleet || []);
+    setReviews(rd.reviews || []);
+    setNews(nd.news || []);
+    setSettings(sd.settings || {});
   };
 
   const submitReview = async () => {

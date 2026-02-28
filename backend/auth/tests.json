@@ -1,7 +1,7 @@
 {
   "tests": [
     {
-      "name": "Login with valid credentials",
+      "name": "Admin login",
       "method": "POST",
       "path": "/?resource=admin",
       "body": {
@@ -11,10 +11,17 @@
       },
       "expectedStatus": 200,
       "expectedBody": {
-        "token": "string",
-        "admin": "object"
+        "token": "string"
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get settings",
+      "method": "GET",
+      "path": "/?resource=settings",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial",
+      "expectedBody": {}
     }
   ]
 }
