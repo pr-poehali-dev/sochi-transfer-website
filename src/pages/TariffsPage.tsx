@@ -238,7 +238,7 @@ const TariffsPage = () => {
                     </div>
                     <p className="font-semibold text-sm">{cls.label}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{cls.description}</p>
-                    <Badge className={`mt-2 text-[10px] ${colors.badge}`}>×{cls.price_multiplier.toFixed(1)}</Badge>
+                    <Badge className={`mt-2 text-[10px] ${colors.badge}`}>×{parseFloat(String(cls.price_multiplier)).toFixed(1)}</Badge>
                   </CardContent>
                 </Card>
               );
@@ -296,7 +296,7 @@ const TariffsPage = () => {
                   >
                     {carClasses.map(c => (
                       <option key={c.value} value={c.value}>
-                        {c.label} (×{c.price_multiplier.toFixed(1)})
+                        {c.label} (×{parseFloat(String(c.price_multiplier)).toFixed(1)})
                       </option>
                     ))}
                   </select>
@@ -313,7 +313,7 @@ const TariffsPage = () => {
                       {calcClass?.label}
                       {calcClass && (
                         <span className="ml-1 text-xs">
-                          (×{calcClass.price_multiplier.toFixed(1)})
+                          (×{parseFloat(String(calcClass.price_multiplier)).toFixed(1)})
                         </span>
                       )}
                     </p>
@@ -342,7 +342,7 @@ const TariffsPage = () => {
                     <div>базовая цена</div>
                   </div>
                   <div className="bg-muted/40 rounded-lg p-2">
-                    <div className="font-semibold text-foreground">×{calcClass.price_multiplier.toFixed(1)}</div>
+                    <div className="font-semibold text-foreground">×{parseFloat(String(calcClass.price_multiplier)).toFixed(1)}</div>
                     <div>коэффициент</div>
                   </div>
                   <div className="bg-primary/10 rounded-lg p-2 border border-primary/20">
