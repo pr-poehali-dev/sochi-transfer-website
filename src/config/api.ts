@@ -29,4 +29,7 @@ export const API_URLS = {
   // Transfer types & Car classes — через tariffs
   transferTypes: `${TARIFFS_BASE}?resource=transfer_types`,
   carClasses: `${TARIFFS_BASE}?resource=car_classes`,
+
+  // Managers — через auth
+  managers: `${AUTH_BASE}?resource=managers`,
 };

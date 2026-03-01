@@ -22,6 +22,14 @@
       "expectedStatus": 200,
       "bodyMatcher": "partial",
       "expectedBody": {}
+    },
+    {
+      "name": "Get managers",
+      "method": "GET",
+      "path": "/?resource=managers",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial",
+      "expectedBody": {}
     }
   ]
 }

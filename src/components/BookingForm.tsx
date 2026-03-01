@@ -36,6 +36,13 @@ interface CarClass {
   price_multiplier: number;
 }
 
+interface Service {
+  id: number;
+  name: string;
+  price: number;
+  icon?: string;
+}
+
 // ─── Static defaults ──────────────────────────────────────────────────────────
 
 const DEFAULT_TRANSFER_TYPES: TransferType[] = [
@@ -135,6 +142,8 @@ const BookingForm = () => {
   const [basePrice, setBasePrice] = useState(0);
   const [userBalance, setUserBalance] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  const [selectedServices, setSelectedServices] = useState<number[]>([]);
 
   const [formData, setFormData] = useState({
     from_location: 'Аэропорт Сочи',
@@ -159,6 +168,7 @@ const BookingForm = () => {
     loadTariffs();
     loadTransferConfig();
     checkAuth();
+    loadServices();
   }, []);
 
   const checkAuth = async () => {
@@ -201,6 +211,25 @@ const BookingForm = () => {
     } catch { /* use defaults */ }
   };
 
+  const loadServices = async () => {
+    try {
+      const r = await fetch(`${API_URLS.services}&active=true`);
+      const d = await r.json();
+      setServices(d.services || []);
+    } catch { /* silent */ }
+  };
+
+  const servicesTotal = selectedServices.reduce((sum, sid) => {
+    const svc = services.find(s => s.id === sid);
+    return sum + (svc ? svc.price : 0);
+  }, 0);
+
+  const toggleService = (sid: number) => {
+    setSelectedServices(prev =>
+      prev.includes(sid) ? prev.filter(id => id !== sid) : [...prev, sid]
+    );
+  };
+
   // ── Price calculation ─────────────────────────────────────────────────────
 
   const calcPrice = (
@@ -216,8 +245,9 @@ const BookingForm = () => {
     return Math.round(base * multiplier);
   };
 
-  const prepayAmount = Math.round(formData.price * 0.3);
-  const canPayByBalance = isLoggedIn && userBalance >= formData.price && formData.price > 0;
+  const totalPrice = formData.price + servicesTotal;
+  const prepayAmount = Math.round(totalPrice * 0.3);
+  const canPayByBalance = isLoggedIn && userBalance >= totalPrice && totalPrice > 0;
 
   // ── Field handlers ────────────────────────────────────────────────────────
 
@@ -284,6 +314,8 @@ const BookingForm = () => {
           status_id: 1,
           passengers_count: parseInt(formData.passengers_count),
           user_id: parseInt(userId),
+          price: totalPrice,
+          services: selectedServices,
         }),
       });
 
@@ -641,6 +673,42 @@ const BookingForm = () => {
             </div>
 
             {/* ══════════════════════════════════
+                STEP 7 — Additional services
+            ══════════════════════════════════ */}
+            {services.length > 0 && (
+              <div>
+                <FieldLabel optional>Дополнительные услуги</FieldLabel>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {services.map(svc => {
+                    const active = selectedServices.includes(svc.id);
+                    return (
+                      <button
+                        key={svc.id}
+                        type="button"
+                        onClick={() => toggleService(svc.id)}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          active
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border bg-white/40 dark:bg-white/5 hover:border-primary/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon
+                            name={(svc.icon as Parameters<typeof Icon>[0]['name']) || 'Star'}
+                            fallback="Star"
+                            className={`h-4 w-4 flex-shrink-0 ${active ? 'text-primary' : 'text-muted-foreground'}`}
+                          />
+                          <p className={`text-xs font-semibold leading-tight ${active ? 'text-primary' : ''}`}>{svc.name}</p>
+                        </div>
+                        <p className={`text-xs font-bold ${active ? 'text-primary' : 'text-muted-foreground'}`}>+{fmt(svc.price)} ₽</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════════════════════
                 PRICE CARD + PAYMENT
             ══════════════════════════════════ */}
             {formData.price > 0 && (
@@ -651,7 +719,7 @@ const BookingForm = () => {
                     <div>
                       <p className="text-xs text-muted-foreground mb-0.5">Итоговая стоимость</p>
                       <div className="text-4xl font-extrabold text-gradient leading-none">
-                        {fmt(formData.price)} ₽
+                        {fmt(totalPrice)} ₽
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">за весь автомобиль</p>
                     </div>
@@ -671,7 +739,7 @@ const BookingForm = () => {
                     {transferType !== 'group' && selectedClass && (
                       <div className="flex justify-between">
                         <span>Класс «{selectedClass.label}»</span>
-                        <span>×{selectedClass.price_multiplier.toFixed(1)}</span>
+                        <span>×{parseFloat(String(selectedClass.price_multiplier)).toFixed(1)}</span>
                       </div>
                     )}
                     {transferType === 'group' && (
@@ -680,9 +748,15 @@ const BookingForm = () => {
                         <span>1 500 ₽ × {pCount} чел.</span>
                       </div>
                     )}
+                    {servicesTotal > 0 && (
+                      <div className="flex justify-between">
+                        <span>Доп. услуги ({selectedServices.length})</span>
+                        <span>+{fmt(servicesTotal)} ₽</span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-semibold text-foreground border-t border-primary/15 pt-1 mt-1">
                       <span>Итого</span>
-                      <span>{fmt(formData.price)} ₽</span>
+                      <span>{fmt(totalPrice)} ₽</span>
                     </div>
                   </div>
                 </div>
@@ -695,14 +769,14 @@ const BookingForm = () => {
                       active={formData.payment_type === 'cash' && !formData.payment_from_balance}
                       onClick={() => setFormData(prev => ({ ...prev, payment_type: 'cash', payment_from_balance: false }))}
                       label="Наличные"
-                      price={`${fmt(formData.price)} ₽`}
+                      price={`${fmt(totalPrice)} ₽`}
                       sub="при посадке"
                     />
                     <PayOption
                       active={formData.payment_type === 'full' && !formData.payment_from_balance}
                       onClick={() => setFormData(prev => ({ ...prev, payment_type: 'full', payment_from_balance: false }))}
                       label="Онлайн"
-                      price={`${fmt(formData.price)} ₽`}
+                      price={`${fmt(totalPrice)} ₽`}
                       sub="картой сейчас"
                     />
                     <PayOption
@@ -710,15 +784,15 @@ const BookingForm = () => {
                       onClick={() => setFormData(prev => ({ ...prev, payment_type: 'prepay', payment_from_balance: false }))}
                       label="Предоплата 30%"
                       price={`${fmt(prepayAmount)} ₽`}
-                      sub={`+${fmt(formData.price - prepayAmount)} ₽ при посадке`}
+                      sub={`+${fmt(totalPrice - prepayAmount)} ₽ при посадке`}
                     />
                     {canPayByBalance && (
                       <PayOption
                         active={formData.payment_from_balance}
                         onClick={() => setFormData(prev => ({ ...prev, payment_type: 'full', payment_from_balance: true }))}
                         label="С баланса"
-                        price={`${fmt(formData.price)} ₽`}
-                        sub={`Остаток: ${fmt(userBalance - formData.price)} ₽`}
+                        price={`${fmt(totalPrice)} ₽`}
+                        sub={`Остаток: ${fmt(userBalance - totalPrice)} ₽`}
                         green
                       />
                     )}
@@ -744,8 +818,8 @@ const BookingForm = () => {
                   <>
                     <Icon name="Send" className="mr-2 h-5 w-5" />
                     Отправить заявку
-                    {formData.price > 0 && (
-                      <span className="ml-2 opacity-80 text-sm">· {fmt(formData.price)} ₽</span>
+                    {totalPrice > 0 && (
+                      <span className="ml-2 opacity-80 text-sm">· {fmt(totalPrice)} ₽</span>
                     )}
                   </>
                 ) : (

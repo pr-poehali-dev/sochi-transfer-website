@@ -770,8 +770,59 @@ def handle_balance(method, event, params, data, headers):
     return resp(405, {'error': 'Method not allowed'})
 
 
+# ===== MANAGERS =====
+def handle_managers(method, event, params, data):
+    '''Управление менеджерами и модераторами (admins с role=manager)'''
+    if method == 'GET':
+        action = params.get('action', 'managers')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"SELECT id,email,name,role,is_active,permissions,last_login,created_at FROM {SCHEMA}.admins ORDER BY created_at DESC")
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return resp(200, {'managers': rows})
+
+    elif method == 'POST':
+        action = data.get('action', '')
+
+        if action == 'create_manager':
+            email = data.get('email', '').strip()
+            name = data.get('name', '').strip()
+            password = data.get('password', '')
+            role = data.get('role', 'manager')
+            permissions = data.get('permissions', {})
+            if not email or not name or not password:
+                return resp(400, {'error': 'Email, имя и пароль обязательны'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id FROM {SCHEMA}.admins WHERE email=%s", (email,))
+            if cur.fetchone():
+                cur.close(); conn.close(); return resp(400, {'error': 'Пользователь с таким email уже существует'})
+            perms_json = json.dumps(permissions)
+            cur.execute(f"INSERT INTO {SCHEMA}.admins (email,name,password_hash,role,is_active,permissions) VALUES (%s,%s,%s,%s,true,%s) RETURNING id",
+                        (email, name, hash_password(password), role, perms_json))
+            aid = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            return resp(201, {'id': aid, 'message': 'Менеджер создан'})
+
+        elif action == 'update_manager':
+            aid = data.get('id')
+            if not aid:
+                return resp(400, {'error': 'id обязателен'})
+            permissions = data.get('permissions', {})
+            perms_json = json.dumps(permissions)
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"UPDATE {SCHEMA}.admins SET name=%s,role=%s,is_active=%s,permissions=%s WHERE id=%s",
+                        (data.get('name'), data.get('role', 'manager'), data.get('is_active', True), perms_json, int(aid)))
+            if data.get('new_password'):
+                cur.execute(f"UPDATE {SCHEMA}.admins SET password_hash=%s WHERE id=%s", (hash_password(data['new_password']), int(aid)))
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Обновлено'})
+
+    return resp(405, {'error': 'Method not allowed'})
+
+
 def handler(event: dict, context) -> dict:
-    '''Мультироутер авторизации: admin, users, drivers, reviews, settings, balance — по параметру ?resource='''
+    '''Мультироутер авторизации: admin, users, drivers, reviews, settings, balance, managers — по параметру ?resource='''
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': {**CORS, 'Access-Control-Max-Age': '86400'}, 'body': ''}
 
@@ -797,6 +848,8 @@ def handler(event: dict, context) -> dict:
             return handle_settings(method, event, params, data)
         elif resource == 'balance':
             return handle_balance(method, event, params, data, headers)
+        elif resource == 'managers':
+            return handle_managers(method, event, params, data)
         else:
             return handle_admin(method, event, params, data)
     except Exception as e:

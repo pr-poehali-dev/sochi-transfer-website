@@ -341,17 +341,40 @@ const Index = () => {
               {/* Divider */}
               <div className="h-px bg-border my-2" />
 
+              {/* Telegram group — mobile */}
+              {telegramGroupUrl && settings['telegram_group_show'] !== 'false' && (
+                <a href={telegramGroupUrl} target="_blank" rel="noopener noreferrer">
+                  <button className="w-full text-left px-4 py-3 rounded-xl text-base font-medium hover:bg-blue-50 transition-colors flex items-center gap-3 min-h-[52px] text-blue-600 border border-blue-200">
+                    <Icon name="Send" className="h-5 w-5" />
+                    {settings['telegram_group_title'] || 'Telegram группа'}
+                  </button>
+                </a>
+              )}
+
+              {/* Divider */}
+              <div className="h-px bg-border my-2" />
+
               {/* Auth buttons */}
               <div className="flex flex-col gap-2 pt-1">
                 {isLoggedIn ? (
-                  <Button
-                    className="w-full min-h-[52px] text-base"
-                    variant="outline"
-                    onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
-                  >
-                    <Icon name="User" className="mr-2 h-5 w-5" />
-                    Личный кабинет
-                  </Button>
+                  <>
+                    <Button
+                      className="w-full min-h-[52px] text-base"
+                      variant="outline"
+                      onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
+                    >
+                      <Icon name="User" className="mr-2 h-5 w-5" />
+                      Личный кабинет
+                    </Button>
+                    <Button
+                      className="w-full min-h-[48px]"
+                      variant="outline"
+                      onClick={() => { navigate('/passenger'); setMobileMenuOpen(false); }}
+                    >
+                      <Icon name="Users" className="mr-2 h-4 w-4" />
+                      Кабинет попутчика
+                    </Button>
+                  </>
                 ) : (
                   <Button
                     className="w-full gradient-primary text-white min-h-[52px] text-base font-semibold"
