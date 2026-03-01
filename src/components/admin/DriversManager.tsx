@@ -29,6 +29,13 @@ interface Driver {
   driver_type?: string;
   car_category?: string;
   identity_verified?: boolean;
+  passport_photo_url?: string;
+  license_front_url?: string;
+  license_back_url?: string;
+  car_tech_passport_front_url?: string;
+  car_tech_passport_back_url?: string;
+  car_photos_urls?: string[];
+  identity_doc_url?: string;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -248,6 +255,55 @@ const DriversManager = () => {
                 <div><span className="text-muted-foreground">Заказов:</span><br />{selected.total_orders}</div>
                 <div><span className="text-muted-foreground">Рейтинг:</span><br />★ {Number(selected.rating).toFixed(1)}</div>
               </div>
+
+              {/* Документы */}
+              {(selected.passport_photo_url || selected.license_front_url || selected.license_back_url || selected.car_tech_passport_front_url || selected.car_tech_passport_back_url || selected.identity_doc_url) && (
+                <div>
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    <Icon name="FileText" className="h-4 w-4" />
+                    Документы водителя
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { url: selected.passport_photo_url, label: 'Паспорт' },
+                      { url: selected.identity_doc_url, label: 'Удостоверение' },
+                      { url: selected.license_front_url, label: 'Права (лицо)' },
+                      { url: selected.license_back_url, label: 'Права (обратно)' },
+                      { url: selected.car_tech_passport_front_url, label: 'ТП авто (лицо)' },
+                      { url: selected.car_tech_passport_back_url, label: 'ТП авто (обратно)' },
+                    ].filter(d => d.url).map(({ url, label }) => (
+                      <a key={label} href={url!} target="_blank" rel="noreferrer"
+                        className="block border rounded-lg overflow-hidden hover:border-primary transition-colors group">
+                        <img src={url!} alt={label} className="w-full h-24 object-cover group-hover:opacity-90 transition-opacity" />
+                        <p className="text-xs text-center py-1 text-muted-foreground bg-muted/50">{label}</p>
+                      </a>
+                    ))}
+                  </div>
+                  {selected.car_photos_urls && selected.car_photos_urls.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Фото автомобиля</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {selected.car_photos_urls.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noreferrer">
+                            <img src={url} alt={`Фото авто ${i + 1}`} className="w-full h-16 object-cover rounded border hover:border-primary transition-colors" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2 mt-3">
+                    <Button size="sm" className="flex-1 bg-green-500 hover:bg-green-600 text-white" onClick={async () => {
+                      await fetch(API_URLS.drivers, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update', driver_id: selected.id, identity_verified: true }) });
+                      toast({ title: 'Документы подтверждены ✓' });
+                      loadDrivers();
+                      setSelected(prev => prev ? { ...prev, identity_verified: true } : null);
+                    }}>
+                      <Icon name="ShieldCheck" className="h-3.5 w-3.5 mr-1" />
+                      Подтвердить документы
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label>Комиссия платформы (%)</Label>

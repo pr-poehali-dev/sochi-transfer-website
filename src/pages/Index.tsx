@@ -57,6 +57,20 @@ const Index = () => {
       script.innerHTML = `(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");ym(${id},"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true});`;
       document.head.appendChild(script);
     }
+    const headScript = settings['custom_head_script'];
+    if (headScript && !document.getElementById('custom-head-script')) {
+      const div = document.createElement('div');
+      div.id = 'custom-head-script';
+      div.innerHTML = headScript;
+      Array.from(div.children).forEach(el => document.head.appendChild(el));
+    }
+    const bodyScript = settings['custom_body_script'];
+    if (bodyScript && !document.getElementById('custom-body-script')) {
+      const div = document.createElement('div');
+      div.id = 'custom-body-script';
+      div.innerHTML = bodyScript;
+      document.body.appendChild(div);
+    }
   }, [settings]);
 
   const loadAll = async () => {
@@ -137,7 +151,7 @@ const Index = () => {
   const siteYear    = settings['site_year']       || '2012';
 
   // Desktop nav sections (scroll-based)
-  const navSections = ['Главная', 'Тарифы', 'Автопарк', 'О нас', 'Отзывы', 'Контакты'];
+  const navSections = ['Главная', 'Автопарк', 'О нас', 'Отзывы', 'Контакты'];
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -680,36 +694,38 @@ const Index = () => {
       {/* ════════════════════════════════════════════════
           RIDESHARES PROMO
       ════════════════════════════════════════════════ */}
-      <section id="попутчики" className="py-10 md:py-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <Card className="bg-gradient-to-br from-primary/10 via-background to-accent/10 border-2 border-primary/20 overflow-hidden">
-              <CardContent className="p-5 md:p-12">
-                <div className="flex flex-col md:flex-row items-center gap-5 md:gap-8">
-                  <div className="flex-1 text-center md:text-left">
-                    <Badge className="mb-3 md:mb-4 gradient-primary text-white border-0">Сервис</Badge>
-                    <h2 className="text-xl md:text-4xl font-bold mb-3 md:mb-4">Едем вместе — дешевле!</h2>
-                    <p className="text-sm md:text-lg text-muted-foreground mb-4 md:mb-6">
-                      Раздели стоимость трансфера с другими пассажирами. Находи попутчиков из аэропорта Сочи в Абхазию.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
-                      <Button className="gradient-primary text-white min-h-[48px]" onClick={() => navigate('/rideshares')}>
-                        <Icon name="Users" className="mr-2 h-4 w-4" />
-                        Найти попутчиков
-                      </Button>
-                      <Button variant="outline" className="min-h-[48px]" onClick={() => navigate('/rideshares')}>
-                        <Icon name="Plus" className="mr-2 h-4 w-4" />
-                        Предложить поездку
-                      </Button>
+      {settings['feature_rideshares'] !== 'false' && (
+        <section id="попутчики" className="py-10 md:py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <Card className="bg-gradient-to-br from-primary/10 via-background to-accent/10 border-2 border-primary/20 overflow-hidden">
+                <CardContent className="p-5 md:p-12">
+                  <div className="flex flex-col md:flex-row items-center gap-5 md:gap-8">
+                    <div className="flex-1 text-center md:text-left">
+                      <Badge className="mb-3 md:mb-4 gradient-primary text-white border-0">Сервис</Badge>
+                      <h2 className="text-xl md:text-4xl font-bold mb-3 md:mb-4">Едем вместе — дешевле!</h2>
+                      <p className="text-sm md:text-lg text-muted-foreground mb-4 md:mb-6">
+                        Раздели стоимость трансфера с другими пассажирами. Находи попутчиков из аэропорта Сочи в Абхазию.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
+                        <Button className="gradient-primary text-white min-h-[48px]" onClick={() => navigate('/rideshares')}>
+                          <Icon name="Users" className="mr-2 h-4 w-4" />
+                          Найти попутчиков
+                        </Button>
+                        <Button variant="outline" className="min-h-[48px]" onClick={() => navigate('/rideshares')}>
+                          <Icon name="Plus" className="mr-2 h-4 w-4" />
+                          Предложить поездку
+                        </Button>
+                      </div>
                     </div>
+                    <div className="text-5xl md:text-8xl">🚕</div>
                   </div>
-                  <div className="text-5xl md:text-8xl">🚕</div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ════════════════════════════════════════════════
           ABOUT
@@ -744,6 +760,55 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* ════════════════════════════════════════════════
+          NEWS
+      ════════════════════════════════════════════════ */}
+      {news.length > 0 && (
+        <section className="py-10 md:py-16 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-8 md:mb-10">
+              <Badge className="mb-3 md:mb-4 gradient-secondary text-white border-0">Новости</Badge>
+              <h2 className="text-2xl md:text-3xl font-bold">Последние новости</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
+              {news.slice(0, 3).map(n => (
+                <Card
+                  key={String(n.id)}
+                  className="hover:shadow-lg transition-all cursor-pointer group"
+                  onClick={() => navigate('/news')}
+                >
+                  {n.image_url && (
+                    <img
+                      src={String(n.image_url)}
+                      alt={String(n.title)}
+                      className="w-full h-36 md:h-40 object-cover rounded-t-lg"
+                    />
+                  )}
+                  <CardContent className="p-4">
+                    <p className="font-semibold mb-2 line-clamp-2 text-sm md:text-base group-hover:text-primary transition-colors">
+                      {String(n.title)}
+                    </p>
+                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-3">{String(n.content)}</p>
+                    {n.published_at && (
+                      <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+                        <Icon name="Calendar" className="h-3 w-3" />
+                        {new Date(String(n.published_at)).toLocaleDateString('ru', { day: 'numeric', month: 'long' })}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="text-center mt-6">
+              <Button variant="outline" onClick={() => navigate('/news')}>
+                <Icon name="Newspaper" className="mr-2 h-4 w-4" />
+                Все новости
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ════════════════════════════════════════════════
           REVIEWS — simple grid, works on mobile
@@ -857,56 +922,6 @@ const Index = () => {
           </div>
         </div>
       </section>
-
-      {/* ════════════════════════════════════════════════
-          NEWS
-      ════════════════════════════════════════════════ */}
-      {news.length > 0 && (
-        <section className="py-10 md:py-16 bg-muted/30">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-8 md:mb-10">
-              <Badge className="mb-3 md:mb-4 gradient-secondary text-white border-0">Новости</Badge>
-              <h2 className="text-2xl md:text-3xl font-bold">Последние новости</h2>
-            </div>
-            {/* 1 col on mobile, 2 on sm, 3 on md */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
-              {news.slice(0, 3).map(n => (
-                <Card
-                  key={String(n.id)}
-                  className="hover:shadow-lg transition-all cursor-pointer group"
-                  onClick={() => navigate('/news')}
-                >
-                  {n.image_url && (
-                    <img
-                      src={String(n.image_url)}
-                      alt={String(n.title)}
-                      className="w-full h-36 md:h-40 object-cover rounded-t-lg"
-                    />
-                  )}
-                  <CardContent className="p-4">
-                    <p className="font-semibold mb-2 line-clamp-2 text-sm md:text-base group-hover:text-primary transition-colors">
-                      {String(n.title)}
-                    </p>
-                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-3">{String(n.content)}</p>
-                    {n.published_at && (
-                      <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-                        <Icon name="Calendar" className="h-3 w-3" />
-                        {new Date(String(n.published_at)).toLocaleDateString('ru', { day: 'numeric', month: 'long' })}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            <div className="text-center mt-6">
-              <Button variant="outline" onClick={() => navigate('/news')}>
-                <Icon name="Newspaper" className="mr-2 h-4 w-4" />
-                Все новости
-              </Button>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ════════════════════════════════════════════════
           CONTACTS

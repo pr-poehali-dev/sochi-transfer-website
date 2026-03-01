@@ -165,6 +165,11 @@ const DriverCabinet = () => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawRequisites, setWithdrawRequisites] = useState('');
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositMethod, setDepositMethod] = useState<'admin' | 'sbp' | 'card'>('admin');
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<Record<string, string>>({});
 
   const driverId = localStorage.getItem('driver_id');
   const driverName = localStorage.getItem('driver_name') || 'Водитель';
@@ -196,6 +201,7 @@ const DriverCabinet = () => {
       }
       loadReviews();
       loadTransactions();
+      loadPaymentSettings();
     } catch (e) {
       console.error('[DriverCabinet] loadData error:', e);
       toast({ title: 'Ошибка загрузки данных', variant: 'destructive' });
@@ -231,6 +237,35 @@ const DriverCabinet = () => {
       setTransactions(data.transactions || []);
     } catch (e) {
       console.error('[DriverCabinet] loadTransactions error:', e);
+    }
+  };
+
+  const loadPaymentSettings = async () => {
+    try {
+      const r = await fetch(API_URLS.settings);
+      const data = await r.json();
+      setPaymentSettings(data.settings || {});
+    } catch { /* silent */ }
+  };
+
+  const submitDeposit = async () => {
+    if (!depositAmount || parseFloat(depositAmount) <= 0) {
+      toast({ title: 'Укажите сумму', variant: 'destructive' }); return;
+    }
+    setDepositLoading(true);
+    try {
+      await fetch(API_URLS.balance, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deposit', amount: parseFloat(depositAmount), payment_method: depositMethod, driver_id: driverId })
+      });
+      toast({ title: 'Заявка на пополнение отправлена', description: 'Администратор зачислит средства в ближайшее время' });
+      setDepositOpen(false);
+      setDepositAmount('');
+    } catch {
+      toast({ title: 'Ошибка', variant: 'destructive' });
+    } finally {
+      setDepositLoading(false);
     }
   };
 
@@ -649,6 +684,58 @@ const DriverCabinet = () => {
                     </p>
                   )}
 
+                  <div className="grid grid-cols-2 gap-2">
+                    <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full bg-green-500 hover:bg-green-600 text-white min-h-[48px]">
+                          <Icon name="Plus" className="mr-2 h-4 w-4" />Пополнить
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="mx-3 rounded-xl">
+                        <DialogHeader><DialogTitle>Пополнение баланса</DialogTitle></DialogHeader>
+                        <div className="space-y-4 pt-2">
+                          <div>
+                            <Label className="text-sm mb-1.5 block">Сумма (₽)</Label>
+                            <Input type="number" placeholder="1000" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} className="h-11" />
+                          </div>
+                          <div>
+                            <Label className="text-sm mb-2 block">Способ пополнения</Label>
+                            <div className="space-y-2">
+                              {[
+                                { id: 'admin', label: 'Через администратора', desc: 'Переведите средства и свяжитесь с поддержкой' },
+                                { id: 'sbp', label: 'СБП', desc: paymentSettings['sbp_phone'] ? `Телефон: ${paymentSettings['sbp_phone']}` : 'Настройте номер СБП в админ-панели' },
+                                { id: 'card', label: 'На карту', desc: paymentSettings['card_number'] ? `Карта: ${paymentSettings['card_number']}` : 'Настройте номер карты в админ-панели' },
+                              ].map(m => (
+                                <button key={m.id} type="button" onClick={() => setDepositMethod(m.id as 'admin' | 'sbp' | 'card')}
+                                  className={`w-full text-left p-3 rounded-lg border-2 transition-all ${depositMethod === m.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'}`}>
+                                  <p className={`text-sm font-medium ${depositMethod === m.id ? 'text-primary' : ''}`}>{m.label}</p>
+                                  <p className="text-xs text-muted-foreground">{m.desc}</p>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {depositMethod === 'sbp' && paymentSettings['sbp_phone'] && (
+                            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                              <p className="font-medium mb-1">Реквизиты СБП:</p>
+                              <p className="text-primary font-mono">{paymentSettings['sbp_phone']}</p>
+                              <p className="text-xs text-muted-foreground mt-1">После перевода нажмите «Отправить заявку»</p>
+                            </div>
+                          )}
+                          {depositMethod === 'card' && paymentSettings['card_number'] && (
+                            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                              <p className="font-medium mb-1">Номер карты:</p>
+                              <p className="text-primary font-mono">{paymentSettings['card_number']}</p>
+                              <p className="text-xs text-muted-foreground mt-1">После перевода нажмите «Отправить заявку»</p>
+                            </div>
+                          )}
+                          <Button className="w-full gradient-primary text-white min-h-[48px]" onClick={submitDeposit} disabled={depositLoading}>
+                            {depositLoading && <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />}
+                            Отправить заявку
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
                   <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
                     <DialogTrigger asChild>
                       <Button className="w-full gradient-primary text-white min-h-[48px]">
@@ -686,6 +773,7 @@ const DriverCabinet = () => {
                       </div>
                     </DialogContent>
                   </Dialog>
+                  </div>
                 </CardContent>
               </Card>
 

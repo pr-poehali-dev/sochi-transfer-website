@@ -111,6 +111,10 @@ const SiteSettingsManager = () => {
           <Icon name="Car" className="mr-1.5 h-3.5 w-3.5" />
           Стать водителем
         </TabsTrigger>
+        <TabsTrigger value="features">
+          <Icon name="ToggleLeft" className="mr-1.5 h-3.5 w-3.5" />
+          Функции
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="seo">
@@ -220,19 +224,50 @@ const SiteSettingsManager = () => {
       </TabsContent>
 
       <TabsContent value="metrika">
-        <Card>
-          <CardHeader><CardTitle>Яндекс.Метрика</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Номер счётчика Яндекс.Метрики</Label>
-              <Input value={settings['yandex_metrika_id'] || ''} onChange={e => set('yandex_metrika_id', e.target.value)} placeholder="12345678" />
-              <p className="text-xs text-muted-foreground mt-1">
-                Найдите номер в разделе &quot;Настройки → Код счётчика&quot; в личном кабинете Яндекс.Метрики
-              </p>
-            </div>
-            <SaveButton keys={['yandex_metrika_id']} />
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Яндекс.Метрика</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Номер счётчика Яндекс.Метрики</Label>
+                <Input value={settings['yandex_metrika_id'] || ''} onChange={e => set('yandex_metrika_id', e.target.value)} placeholder="12345678" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Найдите номер в разделе «Настройки → Код счётчика» в личном кабинете Яндекс.Метрики. Код автоматически добавится на сайт.
+                </p>
+              </div>
+              <SaveButton keys={['yandex_metrika_id']} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Произвольные скрипты и виджеты</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Скрипт в &lt;head&gt; (Google Analytics, пиксели и т.д.)</Label>
+                <Textarea
+                  value={settings['custom_head_script'] || ''}
+                  onChange={e => set('custom_head_script', e.target.value)}
+                  rows={5}
+                  placeholder={'<script>\n  // ваш код\n</script>'}
+                  className="font-mono text-xs"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Вставьте полный код скрипта включая теги &lt;script&gt;. Код вставляется в начало страницы.</p>
+              </div>
+              <div>
+                <Label>Виджет / код в конце &lt;body&gt; (онлайн-чат, кнопки и т.д.)</Label>
+                <Textarea
+                  value={settings['custom_body_script'] || ''}
+                  onChange={e => set('custom_body_script', e.target.value)}
+                  rows={5}
+                  placeholder={'<script>\n  // ваш виджет\n</script>'}
+                  className="font-mono text-xs"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Код вставляется перед закрывающим тегом &lt;/body&gt;.</p>
+              </div>
+              <SaveButton keys={['custom_head_script', 'custom_body_script']} />
+            </CardContent>
+          </Card>
+        </div>
       </TabsContent>
 
       <TabsContent value="texts">
@@ -414,13 +449,13 @@ const SiteSettingsManager = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => set('allow_transfer_drivers', settings['allow_transfer_drivers'] === 'false' ? 'false' : 'true')}
+                  onClick={() => set('allow_transfer_drivers', settings['allow_transfer_drivers'] === 'true' ? 'false' : 'true')}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                    settings['allow_transfer_drivers'] !== 'false' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                    settings['allow_transfer_drivers'] === 'true' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
                   }`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    settings['allow_transfer_drivers'] !== 'false' ? 'translate-x-6' : 'translate-x-1'
+                    settings['allow_transfer_drivers'] === 'true' ? 'translate-x-6' : 'translate-x-1'
                   }`} />
                 </button>
               </div>
@@ -549,6 +584,40 @@ const SiteSettingsManager = () => {
                 </div>
               ))}
               <SaveButton keys={['become_driver_step1_title', 'become_driver_step1_desc', 'become_driver_step2_title', 'become_driver_step2_desc', 'become_driver_step3_title', 'become_driver_step3_desc', 'become_driver_step4_title', 'become_driver_step4_desc']} />
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="features">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Включение/выключение функций сайта</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                { key: 'feature_rideshares', label: 'Раздел «Попутчики»', desc: 'Страница /rideshares и блок на главной «Едем вместе — дешевле»' },
+                { key: 'feature_driver_register', label: 'Страница «Регистрация водителей»', desc: 'Страница /driver-register (показывает заглушку «В разработке» когда выключено)' },
+                { key: 'feature_passenger_register', label: 'Страница «Регистрация попутчиков»', desc: 'Страница регистрации попутчиков (показывает заглушку «В разработке» когда выключено)' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">{label}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => set(key, settings[key] === 'false' ? 'true' : 'false')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ml-4 ${
+                      settings[key] !== 'false' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings[key] !== 'false' ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+              ))}
+              <SaveButton keys={['feature_rideshares', 'feature_driver_register', 'feature_passenger_register']} />
             </CardContent>
           </Card>
         </div>

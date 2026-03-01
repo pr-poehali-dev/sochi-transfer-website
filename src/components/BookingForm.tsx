@@ -221,7 +221,7 @@ const BookingForm = () => {
 
   const servicesTotal = selectedServices.reduce((sum, sid) => {
     const svc = services.find(s => s.id === sid);
-    return sum + (svc ? svc.price : 0);
+    return sum + (svc ? Number(svc.price) : 0);
   }, 0);
 
   const toggleService = (sid: number) => {
@@ -700,7 +700,7 @@ const BookingForm = () => {
                           />
                           <p className={`text-xs font-semibold leading-tight ${active ? 'text-primary' : ''}`}>{svc.name}</p>
                         </div>
-                        <p className={`text-xs font-bold ${active ? 'text-primary' : 'text-muted-foreground'}`}>+{fmt(svc.price)} ₽</p>
+                        <p className={`text-xs font-bold ${active ? 'text-primary' : 'text-muted-foreground'}`}>+{fmt(Number(svc.price))} ₽</p>
                       </button>
                     );
                   })}

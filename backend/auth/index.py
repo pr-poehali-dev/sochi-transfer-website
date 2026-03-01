@@ -495,7 +495,14 @@ def handle_drivers(method, event, params, data, headers):
             return resp(200, {'orders': orders})
         elif action == 'list':
             conn = get_conn(); cur = conn.cursor()
-            cur.execute(f"SELECT id,name,phone,email,car_brand,car_model,car_color,car_number,status,is_active,is_online,balance,commission_rate,rating,total_orders,driver_type,car_category,created_at FROM {SCHEMA}.drivers ORDER BY created_at DESC")
+            cur.execute(f'''
+                SELECT id,name,phone,email,car_brand,car_model,car_color,car_number,
+                       status,is_active,is_online,balance,commission_rate,rating,total_orders,
+                       driver_type,car_category,identity_verified,created_at,
+                       passport_photo_url,license_front_url,license_back_url,
+                       car_tech_passport_front_url,car_tech_passport_back_url,car_photos_urls,identity_doc_url
+                FROM {SCHEMA}.drivers ORDER BY created_at DESC
+            ''')
             cols = [d[0] for d in cur.description]
             drivers = [dict(zip(cols, r)) for r in cur.fetchall()]
             cur.close(); conn.close()

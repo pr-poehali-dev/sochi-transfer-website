@@ -34,11 +34,11 @@ const DEFAULT_CAR_CLASSES: CarClass[] = [
   { id: 4, value: 'minivan',  label: 'Минивэн', description: 'до 7 пассажиров',            price_multiplier: 1.5 },
 ];
 
-const CLASS_COLORS: Record<string, { badge: string; dot: string; icon: string }> = {
-  economy:  { badge: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',   dot: 'bg-gray-400',   icon: 'Car' },
-  comfort:  { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300', dot: 'bg-blue-500',  icon: 'Car' },
-  business: { badge: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300', dot: 'bg-amber-500', icon: 'Crown' },
-  minivan:  { badge: 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300', dot: 'bg-green-500', icon: 'Users' },
+const CLASS_COLORS: Record<string, { badge: string; dot: string; icon: string; border: string; iconColor: string }> = {
+  economy:  { badge: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',   dot: 'bg-gray-400',   icon: 'Car',   border: 'border-gray-300 dark:border-gray-600',   iconColor: 'text-gray-500 dark:text-gray-400' },
+  comfort:  { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300', dot: 'bg-blue-500',  icon: 'Car',   border: 'border-blue-300 dark:border-blue-700',    iconColor: 'text-blue-500 dark:text-blue-400' },
+  business: { badge: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300', dot: 'bg-amber-500', icon: 'Crown', border: 'border-amber-300 dark:border-amber-700', iconColor: 'text-amber-500 dark:text-amber-400' },
+  minivan:  { badge: 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300', dot: 'bg-green-500', icon: 'Users', border: 'border-green-300 dark:border-green-700', iconColor: 'text-green-500 dark:text-green-400' },
 };
 
 const INCLUDED_ITEMS = [
@@ -619,8 +619,8 @@ const TariffsPage = () => {
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl ${colors.dot} flex items-center justify-center`}>
-                          <Icon name={colors.icon as Parameters<typeof Icon>[0]['name']} className="h-5 w-5 text-white" />
+                        <div className={`w-10 h-10 rounded-xl border-2 bg-transparent flex items-center justify-center ${colors.border}`}>
+                          <Icon name={colors.icon as Parameters<typeof Icon>[0]['name']} className={`h-5 w-5 ${colors.iconColor}`} />
                         </div>
                         <div>
                           <p className="font-bold text-base">{cls.label}</p>

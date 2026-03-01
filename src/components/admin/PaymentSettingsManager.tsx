@@ -131,6 +131,7 @@ const PaymentSettingsManager = () => {
         <TabsTrigger value="payment">Способы оплаты</TabsTrigger>
         <TabsTrigger value="yookassa">ЮКасса</TabsTrigger>
         <TabsTrigger value="robokassa">Робокасса</TabsTrigger>
+        <TabsTrigger value="requisites">Реквизиты</TabsTrigger>
         <TabsTrigger value="email">Email-уведомления</TabsTrigger>
       </TabsList>
 
@@ -352,6 +353,52 @@ const PaymentSettingsManager = () => {
         <Button onClick={handleSaveIntegrations} disabled={isSavingIntegrations} className="gradient-primary text-white">
           {isSavingIntegrations ? <><Icon name="Loader2" className="mr-2 h-4 w-4 animate-spin" />Сохранение...</> : <><Icon name="Save" className="mr-2 h-4 w-4" />Сохранить</>}
         </Button>
+      </TabsContent>
+
+      {/* === РЕКВИЗИТЫ ДЛЯ ПОПОЛНЕНИЯ === */}
+      <TabsContent value="requisites" className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="Wallet" className="h-5 w-5" />
+              Реквизиты для пополнения баланса водителей
+            </CardTitle>
+            <CardDescription>Водители увидят эти данные при запросе пополнения баланса</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Телефон для СБП</Label>
+              <Input className="mt-1" placeholder="+79001234567"
+                value={siteSettings['sbp_phone'] || ''}
+                onChange={e => setSiteSettings(s => ({ ...s, sbp_phone: e.target.value }))} />
+              <p className="text-xs text-muted-foreground mt-1">Номер телефона для переводов через Систему быстрых платежей</p>
+            </div>
+            <div>
+              <Label>Номер карты</Label>
+              <Input className="mt-1" placeholder="4276 1234 5678 9012"
+                value={siteSettings['card_number'] || ''}
+                onChange={e => setSiteSettings(s => ({ ...s, card_number: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Получатель (имя на карте)</Label>
+              <Input className="mt-1" placeholder="Иван И."
+                value={siteSettings['card_holder'] || ''}
+                onChange={e => setSiteSettings(s => ({ ...s, card_holder: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Инструкция для водителя</Label>
+              <Input className="mt-1" placeholder="Переведите сумму и отправьте заявку. Баланс пополнится в течение 30 минут."
+                value={siteSettings['deposit_instruction'] || ''}
+                onChange={e => setSiteSettings(s => ({ ...s, deposit_instruction: e.target.value }))} />
+            </div>
+            <Button className="gradient-primary text-white" onClick={async () => {
+              await fetch(API_URLS.settings, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: { sbp_phone: siteSettings['sbp_phone'] || '', card_number: siteSettings['card_number'] || '', card_holder: siteSettings['card_holder'] || '', deposit_instruction: siteSettings['deposit_instruction'] || '' } }) });
+              toast({ title: 'Реквизиты сохранены' });
+            }}>
+              <Icon name="Save" className="mr-2 h-4 w-4" />Сохранить реквизиты
+            </Button>
+          </CardContent>
+        </Card>
       </TabsContent>
 
       {/* === EMAIL УВЕДОМЛЕНИЯ === */}
