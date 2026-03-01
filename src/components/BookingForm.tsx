@@ -212,7 +212,7 @@ const BookingForm = () => {
     if (type === 'group') {
       return Math.round(1500 * (pCount ?? parseInt(formData.passengers_count) ?? 1));
     }
-    const multiplier = carClasses.find(c => c.value === cls)?.price_multiplier ?? 1;
+    const multiplier = parseFloat(String(carClasses.find(c => c.value === cls)?.price_multiplier ?? 1));
     return Math.round(base * multiplier);
   };
 

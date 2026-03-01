@@ -124,7 +124,7 @@ const TariffsPage = () => {
   const calcTariff = tariffs.find(t => t.id === calcTariffId) ?? tariffs[0] ?? null;
   const calcClass = carClasses.find(c => c.value === calcClassValue) ?? carClasses[0];
   const calcFinalPrice = calcTariff && calcClass
-    ? roundPrice(calcTariff.price * calcClass.price_multiplier)
+    ? roundPrice(calcTariff.price * parseFloat(String(calcClass.price_multiplier)))
     : null;
 
   // Book CTA — navigate home and scroll to booking form
