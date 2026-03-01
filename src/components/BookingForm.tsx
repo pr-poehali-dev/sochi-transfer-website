@@ -487,7 +487,7 @@ const BookingForm = () => {
                 <FieldLabel>Класс автомобиля</FieldLabel>
                 {selectedClass && basePrice > 0 && transferType !== 'group' && (
                   <span className="text-xs text-muted-foreground">
-                    ×{selectedClass.price_multiplier.toFixed(1)} от базовой цены
+                    ×{parseFloat(String(selectedClass.price_multiplier)).toFixed(1)} от базовой цены
                   </span>
                 )}
               </div>
@@ -496,7 +496,7 @@ const BookingForm = () => {
                   const active = carClass === cls.value;
                   const accent = CLASS_ACCENT[cls.value] ?? CLASS_ACCENT.economy;
                   const clsPrice = basePrice > 0 && transferType !== 'group'
-                    ? Math.round(basePrice * cls.price_multiplier)
+                    ? Math.round(basePrice * parseFloat(String(cls.price_multiplier)))
                     : null;
                   return (
                     <button
