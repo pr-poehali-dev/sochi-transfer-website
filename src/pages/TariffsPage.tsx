@@ -628,7 +628,7 @@ const TariffsPage = () => {
                         </div>
                       </div>
                       <Badge className={`text-xs ${colors.badge}`}>
-                        ×{cls.price_multiplier.toFixed(1)}
+                        ×{Number(cls.price_multiplier).toFixed(1)}
                       </Badge>
                     </div>
 
