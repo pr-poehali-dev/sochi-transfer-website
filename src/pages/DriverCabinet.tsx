@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { API_URLS } from '@/config/api';
+import OrderChat from '@/components/OrderChat';
 
 interface Order {
   id: number;
@@ -170,6 +171,7 @@ const DriverCabinet = () => {
   const [depositMethod, setDepositMethod] = useState<'admin' | 'sbp' | 'card'>('admin');
   const [depositLoading, setDepositLoading] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<Record<string, string>>({});
+  const [chatOpenFor, setChatOpenFor] = useState<number | null>(null);
 
   const driverId = localStorage.getItem('driver_id');
   const driverName = localStorage.getItem('driver_name') || 'Водитель';
@@ -653,6 +655,20 @@ const DriverCabinet = () => {
                           commissionAmount={order.commission_amount}
                           commissionRate={driver.commission_rate}
                         />
+
+                        {/* Chat toggle */}
+                        <button
+                          className="mt-3 flex items-center gap-1.5 text-xs text-primary hover:underline"
+                          onClick={() => setChatOpenFor(chatOpenFor === order.id ? null : order.id)}
+                        >
+                          <Icon name="MessageCircle" className="h-3.5 w-3.5" />
+                          {chatOpenFor === order.id ? 'Скрыть чат' : 'Чат с пассажиром'}
+                        </button>
+                        {chatOpenFor === order.id && driverId && (
+                          <div className="mt-2">
+                            <OrderChat orderId={order.id} senderType="driver" senderId={Number(driverId)} compact />
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}

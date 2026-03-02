@@ -66,7 +66,33 @@ const DriversManager = () => {
   const [regLimit, setRegLimit] = useState('');
   const [regEnabled, setRegEnabled] = useState(true);
 
+  const [topupAmount, setTopupAmount] = useState('');
+  const [topupLoading, setTopupLoading] = useState(false);
+
   useEffect(() => { loadDrivers(); loadLimit(); }, []);
+
+  const manualTopup = async () => {
+    if (!selected || !topupAmount || Number(topupAmount) <= 0) {
+      toast({ title: 'Введите сумму пополнения', variant: 'destructive' }); return;
+    }
+    setTopupLoading(true);
+    try {
+      const r = await fetch(API_URLS.balance, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve_deposit', _direct: true, driver_id: selected.id, amount: Number(topupAmount), note: 'Пополнение администратором' })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Ошибка');
+      toast({ title: `Баланс пополнен на ${topupAmount} ₽` });
+      setTopupAmount('');
+      setSelected(prev => prev ? { ...prev, balance: (prev.balance || 0) + Number(topupAmount) } : null);
+      loadDrivers();
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
+    }
+    setTopupLoading(false);
+  };
 
   const loadDrivers = async () => {
     setLoading(true);
@@ -304,6 +330,33 @@ const DriversManager = () => {
                   </div>
                 </div>
               )}
+
+              <div className="border rounded-xl p-3 bg-green-50/50 space-y-2">
+                <Label className="flex items-center gap-1.5 font-semibold">
+                  <Icon name="Wallet" className="h-4 w-4 text-green-600" />
+                  Пополнить баланс вручную
+                </Label>
+                <p className="text-xs text-muted-foreground">Текущий баланс: <strong className="text-green-700">{Number(selected.balance || 0).toFixed(2)} ₽</strong></p>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Сумма, ₽"
+                    value={topupAmount}
+                    onChange={e => setTopupAmount(e.target.value)}
+                    className="h-9"
+                  />
+                  <Button
+                    size="sm"
+                    className="bg-green-500 hover:bg-green-600 text-white whitespace-nowrap"
+                    onClick={manualTopup}
+                    disabled={topupLoading}
+                  >
+                    {topupLoading ? <Icon name="Loader2" className="h-3.5 w-3.5 animate-spin" /> : <Icon name="Plus" className="h-3.5 w-3.5 mr-1" />}
+                    Зачислить
+                  </Button>
+                </div>
+              </div>
 
               <div>
                 <Label>Комиссия платформы (%)</Label>

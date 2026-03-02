@@ -12,6 +12,7 @@ import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 import { API_URLS } from '@/config/api';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import OrderChat from '@/components/OrderChat';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -181,11 +182,14 @@ const DriverCard = ({ order }: { order: Order }) => {
 const OrderCard = ({
   order,
   onReview,
+  userId,
 }: {
   order: Order;
   onReview: (orderId: number) => void;
+  userId: number;
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const hasDriver = !!order.driver_name;
   const isCompleted = order.status_name === 'Выполнен';
 
@@ -284,6 +288,22 @@ const OrderCard = ({
               <Icon name="Clock" className="h-4 w-4 flex-shrink-0" />
               <span>Водитель будет назначен после подтверждения заявки</span>
             </div>
+          )}
+
+          {/* Chat with driver */}
+          {hasDriver && !isCompleted && (
+            <>
+              <button
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                onClick={() => setChatOpen(v => !v)}
+              >
+                <Icon name="MessageCircle" className="h-3.5 w-3.5" />
+                {chatOpen ? 'Скрыть чат' : 'Написать водителю'}
+              </button>
+              {chatOpen && (
+                <OrderChat orderId={order.id} senderType="user" senderId={userId} compact />
+              )}
+            </>
           )}
 
           {/* Review button */}
@@ -690,7 +710,7 @@ const UserProfile = () => {
             ) : (
               <div className="space-y-3">
                 {orders.map(order => (
-                  <OrderCard key={order.id} order={order} onReview={openReview} />
+                  <OrderCard key={order.id} order={order} onReview={openReview} userId={Number(userId)} />
                 ))}
               </div>
             )}

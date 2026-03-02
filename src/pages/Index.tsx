@@ -9,15 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import BookingForm from '@/components/BookingForm';
+import AiAssistant from '@/components/AiAssistant';
 import { API_URLS } from '@/config/api';
 
 const Index = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatSent, setChatSent] = useState(false);
 
   const [tariffs, setTariffs] = useState<Record<string, unknown>[]>([]);
   const [fleet, setFleet] = useState<Record<string, unknown>[]>([]);
@@ -117,16 +115,6 @@ const Index = () => {
     setActiveSection(sectionId);
     setMobileMenuOpen(false);
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleChatSend = () => {
-    if (!chatMessage.trim()) return;
-    const wa = settings['whatsapp_number'];
-    if (wa) {
-      window.open(`https://wa.me/${wa}?text=${encodeURIComponent(chatMessage)}`, '_blank');
-    }
-    setChatSent(true);
-    setChatMessage('');
   };
 
   // ── Derived settings ──────────────────────────────────────────────────────
@@ -1073,80 +1061,9 @@ const Index = () => {
       </footer>
 
       {/* ════════════════════════════════════════════════
-          SUPPORT CHAT BUBBLE
+          AI ASSISTANT
       ════════════════════════════════════════════════ */}
-      {settings['chat_enabled'] !== 'false' && (
-        <>
-          <button
-            onClick={() => setChatOpen(v => !v)}
-            className="fixed bottom-6 right-4 md:right-6 z-50 w-14 h-14 rounded-full gradient-primary shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-            aria-label={chatOpen ? 'Закрыть чат' : 'Открыть чат поддержки'}
-          >
-            <Icon name={chatOpen ? 'X' : 'MessageSquare'} className="h-6 w-6 text-white" />
-          </button>
-
-          {chatOpen && (
-            <div className="fixed bottom-24 right-3 md:right-6 z-50 w-[calc(100vw-1.5rem)] max-w-sm bg-background border border-border rounded-2xl shadow-2xl overflow-hidden animate-scale-in">
-              {/* Header */}
-              <div className="gradient-primary p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <Icon name="Headphones" className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold">Поддержка</p>
-                    <p className="text-white/70 text-xs">Обычно отвечаем за 5 минут</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="p-4">
-                {chatSent ? (
-                  <div className="text-center py-6">
-                    <Icon name="CheckCircle2" className="h-10 w-10 text-green-500 mx-auto mb-3" />
-                    <p className="font-medium">Сообщение отправлено!</p>
-                    <p className="text-sm text-muted-foreground mt-1">Мы ответим вам в WhatsApp</p>
-                    <Button
-                      variant="outline"
-                      className="mt-4 min-h-[44px]"
-                      onClick={() => { setChatSent(false); setChatMessage(''); }}
-                    >
-                      Написать ещё
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="bg-muted/50 rounded-xl p-3 mb-4 text-sm">
-                      👋 Привет! Напишите ваш вопрос, и мы ответим в ближайшее время.
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Ваш вопрос..."
-                        value={chatMessage}
-                        onChange={e => setChatMessage(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleChatSend()}
-                        className="flex-1 h-11"
-                      />
-                      <Button className="gradient-primary text-white min-h-[44px]" onClick={handleChatSend}>
-                        <Icon name="Send" className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {settings['whatsapp_number'] && (
-                      <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" className="w-full mt-2 min-h-[44px] text-green-600 border-green-300 hover:bg-green-50">
-                          <Icon name="MessageCircle" className="mr-2 h-4 w-4" />
-                          Написать в WhatsApp
-                        </Button>
-                      </a>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+      <AiAssistant />
     </div>
   );
 };

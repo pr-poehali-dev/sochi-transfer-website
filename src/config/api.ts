@@ -32,4 +32,8 @@ export const API_URLS = {
 
   // Managers — через auth
   managers: `${AUTH_BASE}?resource=managers`,
+
+  // Chat & AI
+  chat: 'https://functions.poehali.dev/fb797bba-9712-4964-98ef-1b0a6539b395',
+  ai: 'https://functions.poehali.dev/fb797bba-9712-4964-98ef-1b0a6539b395?resource=ai',
 };
