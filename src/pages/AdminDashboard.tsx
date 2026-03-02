@@ -196,8 +196,8 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="transfer_orders" className="space-y-4">
-          <div className="overflow-x-auto">
-            <TabsList className="inline-flex min-w-max gap-0">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
+            <TabsList className="inline-flex min-w-max gap-0 h-auto flex-wrap sm:flex-nowrap">
               <TabsTrigger value="transfer_orders">
                 <Icon name="ShoppingCart" className="mr-1.5 h-4 w-4" />
                 Трансферы

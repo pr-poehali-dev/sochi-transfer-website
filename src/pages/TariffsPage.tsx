@@ -222,7 +222,7 @@ const TariffsPage = () => {
             CAR CLASS BADGES
         ══════════════════════════════════════════ */}
         <section className="pb-8">
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:overflow-visible">
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 sm:overflow-visible">
             {carClasses.map(cls => {
               const colors = CLASS_COLORS[cls.value] ?? CLASS_COLORS.economy;
               const active = calcClassValue === cls.value;
@@ -231,7 +231,7 @@ const TariffsPage = () => {
                   key={cls.value}
                   type="button"
                   onClick={() => setCalcClassValue(cls.value)}
-                  className={`flex-shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 transition-all text-left sm:flex-col sm:items-center sm:text-center sm:p-4 min-w-[140px] sm:min-w-0 ${
+                  className={`flex-shrink-0 flex items-center gap-2 px-2.5 py-2 rounded-xl border-2 transition-all text-left sm:flex-col sm:items-center sm:text-center sm:p-4 min-w-[120px] sm:min-w-0 ${
                     active ? 'border-primary bg-primary/10' : 'border-border bg-white/40 dark:bg-white/5 hover:border-primary/30'
                   }`}
                 >
@@ -241,7 +241,7 @@ const TariffsPage = () => {
                   <div className="sm:text-center">
                     <p className={`font-semibold text-sm ${active ? 'text-primary' : ''}`}>{cls.label}</p>
                     <p className="text-xs text-muted-foreground leading-tight hidden sm:block">{cls.description}</p>
-                    <Badge className={`mt-1 text-[10px] ${colors.badge}`}>×{parseFloat(String(cls.price_multiplier)).toFixed(1)}</Badge>
+                    <Badge className={`mt-1 text-[10px] ${colors.badge}`}>×{(Number(cls.price_multiplier) || 1).toFixed(1)}</Badge>
                   </div>
                 </button>
               );

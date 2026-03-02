@@ -84,7 +84,7 @@ const fmt = (n: number, decimals = 0) =>
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const StatsBar = ({ driver, onWithdraw }: { driver: DriverProfile; onWithdraw: () => void }) => (
-  <div className="grid grid-cols-4 gap-2 mb-4">
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
     <button
       onClick={onWithdraw}
       className="bg-white dark:bg-card rounded-xl p-3 text-center shadow-sm border border-border active:scale-95 transition-transform min-h-[64px] flex flex-col items-center justify-center"
@@ -684,14 +684,14 @@ const DriverCabinet = () => {
                     </p>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
                       <DialogTrigger asChild>
                         <Button className="w-full bg-green-500 hover:bg-green-600 text-white min-h-[48px]">
                           <Icon name="Plus" className="mr-2 h-4 w-4" />Пополнить
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="mx-3 rounded-xl">
+                      <DialogContent className="mx-3 sm:mx-auto max-w-md rounded-xl">
                         <DialogHeader><DialogTitle>Пополнение баланса</DialogTitle></DialogHeader>
                         <div className="space-y-4 pt-2">
                           <div>

@@ -424,7 +424,7 @@ const BookingForm = () => {
             <div>
               <FieldLabel>Тип трансфера</FieldLabel>
               {/* Mobile: horizontal scroll row. Desktop: auto grid based on count */}
-              <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scroll-smooth -mx-1 px-1 sm:overflow-visible sm:grid sm:pb-0"
+              <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scroll-smooth -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible sm:grid sm:pb-0"
                 style={{ gridTemplateColumns: transferTypes.length <= 2 ? `repeat(${transferTypes.length}, 1fr)` : transferTypes.length === 3 ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)' } as React.CSSProperties}
               >
                 {transferTypes.map(type => {
@@ -434,7 +434,7 @@ const BookingForm = () => {
                       key={type.value}
                       type="button"
                       onClick={() => handleTransferTypeChange(type.value)}
-                      className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all text-center min-h-[88px] min-w-[120px] max-w-[160px] flex-shrink-0 snap-start sm:min-w-0 sm:max-w-none sm:flex-shrink sm:flex-1 ${
+                      className={`flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-xl border-2 transition-all text-center min-h-[80px] min-w-[100px] sm:min-w-0 sm:max-w-none flex-shrink-0 snap-start sm:flex-shrink sm:flex-1 ${
                         active
                           ? 'border-primary bg-primary/10'
                           : 'border-border bg-white/40 dark:bg-white/5 hover:border-primary/40'
