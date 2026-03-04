@@ -124,7 +124,7 @@ const TariffsPage = () => {
   const calcTariff = tariffs.find(t => t.id === calcTariffId) ?? tariffs[0] ?? null;
   const calcClass = carClasses.find(c => c.value === calcClassValue) ?? carClasses[0];
   const calcFinalPrice = calcTariff && calcClass
-    ? roundPrice(calcTariff.price * parseFloat(String(calcClass.price_multiplier)))
+    ? roundPrice(calcTariff.price * Number(calcClass.price_multiplier || 1))
     : null;
 
   // Book CTA — navigate home and scroll to booking form
@@ -299,7 +299,7 @@ const TariffsPage = () => {
                   >
                     {carClasses.map(c => (
                       <option key={c.value} value={c.value}>
-                        {c.label} (×{parseFloat(String(c.price_multiplier)).toFixed(1)})
+                        {c.label} (×{(Number(c.price_multiplier) || 1).toFixed(1)})
                       </option>
                     ))}
                   </select>
@@ -316,7 +316,7 @@ const TariffsPage = () => {
                       {calcClass?.label}
                       {calcClass && (
                         <span className="ml-1 text-xs">
-                          (×{parseFloat(String(calcClass.price_multiplier)).toFixed(1)})
+                          (×{(Number(calcClass.price_multiplier) || 1).toFixed(1)})
                         </span>
                       )}
                     </p>
@@ -418,7 +418,7 @@ const TariffsPage = () => {
                           )}
                         </td>
                         {carClasses.map(cls => {
-                          const price = roundPrice(tariff.price * cls.price_multiplier);
+                          const price = roundPrice(tariff.price * Number(cls.price_multiplier || 1));
                           return (
                             <td key={cls.value} className="px-4 py-4 text-right">
                               <span className="font-semibold">{fmt(price)} ₽</span>
@@ -453,7 +453,7 @@ const TariffsPage = () => {
                     <CardContent className="px-4 pb-4">
                       <div className="grid grid-cols-2 gap-2 mb-3">
                         {carClasses.map(cls => {
-                          const price = roundPrice(tariff.price * cls.price_multiplier);
+                          const price = roundPrice(tariff.price * Number(cls.price_multiplier || 1));
                           const colors = CLASS_COLORS[cls.value] ?? CLASS_COLORS.economy;
                           return (
                             <div key={cls.value} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2">
@@ -611,7 +611,7 @@ const TariffsPage = () => {
                 minivan:  ['Кондиционер', 'Вода', 'Wi-Fi', 'До 7 пассажиров', 'Большой багажник'],
               };
               const basePrice = tariffs.length > 0
-                ? roundPrice(tariffs[0].price * cls.price_multiplier)
+                ? roundPrice(tariffs[0].price * Number(cls.price_multiplier || 1))
                 : null;
 
               return (
@@ -628,7 +628,7 @@ const TariffsPage = () => {
                         </div>
                       </div>
                       <Badge className={`text-xs ${colors.badge}`}>
-                        ×{Number(cls.price_multiplier).toFixed(1)}
+                        ×{(Number(cls.price_multiplier) || 1).toFixed(1)}
                       </Badge>
                     </div>
 

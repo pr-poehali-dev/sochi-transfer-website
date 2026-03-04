@@ -303,7 +303,8 @@ def handle_orders(method, event):
 
         payment_info = {}
         provider = site_settings.get('payment_provider', 'none')
-        if data.get('payment_type') in ('full', 'prepay') and provider != 'none':
+        force_payment = data.get('force_payment', False)
+        if (data.get('payment_type') in ('full', 'prepay') and provider != 'none') or (force_payment and provider != 'none'):
             pay_amount = float(data.get('price', 0))
             if data.get('payment_type') == 'prepay':
                 prepay_pct = int(site_settings.get('prepay_percent', '30') or 30)

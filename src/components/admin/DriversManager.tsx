@@ -36,6 +36,7 @@ interface Driver {
   car_tech_passport_back_url?: string;
   car_photos_urls?: string[];
   identity_doc_url?: string;
+  callsign?: string;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -239,7 +240,10 @@ const DriversManager = () => {
                       {d.identity_verified && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">✓ Верифицирован</span>}
                       {d.is_online && <span className="w-2 h-2 rounded-full bg-green-500" title="На линии" />}
                     </div>
-                    <p className="text-sm text-muted-foreground">{d.phone} · {d.car_brand} {d.car_model} · {d.car_number}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {d.callsign && <span className="font-mono font-semibold text-primary mr-1">[{d.callsign}]</span>}
+                      {d.phone} · {d.car_brand} {d.car_model} · {d.car_number}
+                    </p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span>★ {Number(d.rating).toFixed(1)}</span>
                       <span>{d.total_orders} заказов</span>
@@ -280,6 +284,40 @@ const DriversManager = () => {
                 <div><span className="text-muted-foreground">Баланс:</span><br />{Number(selected.balance).toFixed(2)} ₽</div>
                 <div><span className="text-muted-foreground">Заказов:</span><br />{selected.total_orders}</div>
                 <div><span className="text-muted-foreground">Рейтинг:</span><br />★ {Number(selected.rating).toFixed(1)}</div>
+              </div>
+
+              <div className="border rounded-xl p-3 bg-blue-50/50 space-y-2">
+                <Label className="flex items-center gap-1.5 font-semibold">
+                  <Icon name="Radio" className="h-4 w-4 text-blue-600" />
+                  Позывной водителя
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Например: Орёл-1"
+                    value={selected.callsign || ''}
+                    onChange={e => setSelected(prev => prev ? { ...prev, callsign: e.target.value } : null)}
+                    className="h-9"
+                  />
+                  <Button
+                    size="sm"
+                    className="bg-blue-500 hover:bg-blue-600 text-white whitespace-nowrap"
+                    onClick={async () => {
+                      if (!selected) return;
+                      try {
+                        await fetch(API_URLS.drivers, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'update', driver_id: selected.id, callsign: selected.callsign || '' })
+                        });
+                        toast({ title: 'Позывной сохранён' });
+                        loadDrivers();
+                      } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
+                    }}
+                  >
+                    Сохранить
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Используется для идентификации водителя при пополнении баланса</p>
               </div>
 
               {/* Документы */}

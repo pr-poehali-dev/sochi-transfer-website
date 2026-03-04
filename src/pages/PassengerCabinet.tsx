@@ -50,6 +50,27 @@ interface Booking {
   price_per_seat?: number;
 }
 
+interface TransferOrder {
+  id: number;
+  from_location: string;
+  to_location: string;
+  pickup_datetime: string;
+  price: number;
+  status_name: string;
+  status_color: string;
+  car_class: string;
+  transfer_type: string;
+  payment_type: string;
+  driver_name?: string;
+  driver_phone?: string;
+  car_brand?: string;
+  car_model?: string;
+  car_color?: string;
+  car_number?: string;
+  driver_rating?: number;
+  created_at: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CAR_CLASS_LABELS: Record<string, string> = {
@@ -339,6 +360,23 @@ const PassengerCabinet = () => {
   const [bookSeats, setBookSeats] = useState(1);
   const [bookLoading, setBookLoading] = useState(false);
 
+  // Transfer order state
+  const [transferOrders, setTransferOrders] = useState<TransferOrder[]>([]);
+  const [orderDialog, setOrderDialog] = useState(false);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [tariffs, setTariffs] = useState<{id: number; city: string; price: number}[]>([]);
+  const [carClasses, setCarClasses] = useState<{value: string; label: string; price_multiplier: number}[]>([]);
+  const [orderForm, setOrderForm] = useState({
+    from_location: '',
+    to_location: '',
+    pickup_datetime: '',
+    flight_number: '',
+    passengers_count: '1',
+    tariff_id: '',
+    car_class: 'comfort',
+    notes: '',
+  });
+
   // ── Data loading ──────────────────────────────────────────────────────────
 
   const loadRides = useCallback(async () => {
@@ -361,14 +399,41 @@ const PassengerCabinet = () => {
     }
   }, []);
 
+  const loadTariffs = useCallback(async () => {
+    try {
+      const [tRes, ccRes] = await Promise.all([
+        fetch(`${API_URLS.tariffs}?active=true`),
+        fetch(`${API_URLS.carClasses}&active=true`),
+      ]);
+      const tData = await tRes.json();
+      const ccData = await ccRes.json();
+      setTariffs(tData.tariffs || []);
+      if (ccData.car_classes?.length) setCarClasses(ccData.car_classes);
+    } catch { /* ignore */ }
+  }, []);
+
+  const loadTransferOrders = useCallback(async (uid: string) => {
+    try {
+      const res = await fetch(`${API_URLS.users}&action=orders`, {
+        headers: { 'X-User-Id': uid },
+      });
+      const data = await res.json();
+      setTransferOrders(data.orders || []);
+    } catch { /* ignore */ }
+  }, []);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     const uid = readStorage(STORAGE_KEYS.id);
     const promises: Promise<void>[] = [loadRides()];
-    if (uid) promises.push(loadBookings(uid));
+    promises.push(loadTariffs());
+    if (uid) {
+      promises.push(loadBookings(uid));
+      promises.push(loadTransferOrders(uid));
+    }
     await Promise.all(promises);
     setLoading(false);
-  }, [loadRides, loadBookings]);
+  }, [loadRides, loadBookings, loadTariffs, loadTransferOrders]);
 
   useEffect(() => {
     loadAll();
@@ -394,6 +459,7 @@ const PassengerCabinet = () => {
     setUserName('');
     setUserPhone('');
     setMyBookings([]);
+    setTransferOrders([]);
   };
 
   // ── Create ride ───────────────────────────────────────────────────────────
@@ -499,6 +565,63 @@ const PassengerCabinet = () => {
     }
   };
 
+  // ── Create transfer order ────────────────────────────────────────────────
+
+  const computedPrice = (() => {
+    const selectedTariff = tariffs.find(t => t.id === parseInt(orderForm.tariff_id));
+    const selectedClass = carClasses.find(c => c.value === orderForm.car_class);
+    const basePrice = selectedTariff ? Number(selectedTariff.price) : 0;
+    const multiplier = selectedClass ? Number(selectedClass.price_multiplier) : 1;
+    return Math.round(basePrice * multiplier);
+  })();
+
+  const handleCreateOrder = async () => {
+    if (!orderForm.from_location || !orderForm.to_location) {
+      toast({ title: 'Укажите маршрут', variant: 'destructive' }); return;
+    }
+    if (!orderForm.pickup_datetime) {
+      toast({ title: 'Укажите дату и время', variant: 'destructive' }); return;
+    }
+
+    if (computedPrice <= 0) {
+      toast({ title: 'Выберите направление для расчёта цены', variant: 'destructive' }); return;
+    }
+
+    setOrderLoading(true);
+    try {
+      const res = await fetch(API_URLS.orders, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+        body: JSON.stringify({
+          ...orderForm,
+          passengers_count: parseInt(orderForm.passengers_count),
+          tariff_id: orderForm.tariff_id ? parseInt(orderForm.tariff_id) : null,
+          price: computedPrice,
+          passenger_name: userName,
+          passenger_phone: userPhone,
+          user_id: parseInt(userId),
+          payment_type: 'full',
+          transfer_type: 'individual',
+          force_payment: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка создания заказа');
+
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
+      } else {
+        toast({ title: `Заказ #${data.id} создан!` });
+        setOrderDialog(false);
+        if (userId) loadTransferOrders(userId);
+      }
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   // If not logged in — auth is required only to act; public ride list is shown
   // Auth guard for creating rides is inline (button not shown if !isAuth)
@@ -567,9 +690,22 @@ const PassengerCabinet = () => {
       {/* ── Body ── */}
       <main className="max-w-2xl mx-auto px-3 pt-4 pb-28">
 
-        <Tabs defaultValue="rides">
+        <Tabs defaultValue="transfer">
           <div className="overflow-x-auto -mx-3 px-3 mb-4">
             <TabsList className="inline-flex w-max h-10 bg-muted rounded-xl p-1 gap-0">
+              <TabsTrigger
+                value="transfer"
+                className="text-xs px-4 h-8 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm whitespace-nowrap"
+                onClick={() => { if (!isAuth) { setShowAuthScreen(true); } }}
+              >
+                <Icon name="Navigation" className="h-3.5 w-3.5 mr-1.5" />
+                Трансфер
+                {transferOrders.length > 0 && (
+                  <span className="ml-1.5 text-[10px] bg-primary/20 text-primary px-1.5 rounded-full font-semibold">
+                    {transferOrders.length}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger
                 value="rides"
                 className="text-xs px-4 h-8 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm whitespace-nowrap"
@@ -597,6 +733,125 @@ const PassengerCabinet = () => {
               </TabsTrigger>
             </TabsList>
           </div>
+
+          {/* ══ TAB: Transfer ══ */}
+          <TabsContent value="transfer" className="mt-0">
+            {!isAuth ? (
+              <Card>
+                <CardContent className="py-14 text-center space-y-3">
+                  <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+                    <Icon name="Lock" className="h-7 w-7 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Требуется авторизация</p>
+                    <p className="text-sm text-muted-foreground mt-1">Войдите, чтобы заказать трансфер</p>
+                  </div>
+                  <Button className="gradient-primary text-white min-h-[44px]" onClick={() => setShowAuthScreen(true)}>
+                    <Icon name="LogIn" className="mr-2 h-4 w-4" />
+                    Войти / Зарегистрироваться
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : loading ? (
+              <div className="flex justify-center py-16">
+                <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Create order button */}
+                <Button
+                  className="w-full gradient-primary text-white min-h-[48px] font-semibold text-base"
+                  onClick={() => setOrderDialog(true)}
+                >
+                  <Icon name="Plus" className="h-5 w-5 mr-2" />
+                  Заказать трансфер
+                </Button>
+
+                {/* Orders list */}
+                {transferOrders.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-14 text-center space-y-3">
+                      <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+                        <Icon name="Navigation" className="h-7 w-7 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-muted-foreground">Заказов пока нет</p>
+                        <p className="text-sm text-muted-foreground mt-1">Закажите свой первый трансфер</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-3">
+                    {transferOrders.map(order => (
+                      <Card key={order.id} className="border hover:shadow-md transition-shadow">
+                        <CardContent className="p-4 space-y-3">
+                          {/* Route */}
+                          <div className="flex items-start justify-between gap-2">
+                            <RoutePin from={order.from_location} to={order.to_location} />
+                            <Badge
+                              className="shrink-0 text-xs"
+                              style={order.status_color ? {
+                                backgroundColor: `${order.status_color}20`,
+                                color: order.status_color,
+                                borderColor: `${order.status_color}40`,
+                              } : undefined}
+                            >
+                              {order.status_name || 'Новый'}
+                            </Badge>
+                          </div>
+
+                          {/* Meta */}
+                          <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                              <Icon name="Calendar" className="h-3 w-3" />
+                              {formatDatetime(order.pickup_datetime)}
+                            </span>
+                            <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                              <Icon name="Car" className="h-3 w-3" />
+                              {CAR_CLASS_LABELS[order.car_class] || order.car_class}
+                            </span>
+                            <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full font-semibold text-foreground">
+                              <Icon name="Banknote" className="h-3 w-3" />
+                              {Number(order.price).toLocaleString('ru-RU')} ₽
+                            </span>
+                          </div>
+
+                          {/* Driver info */}
+                          {order.driver_name && (
+                            <div className="flex items-center gap-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-xl p-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                                <Icon name="User" className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold">{order.driver_name}</p>
+                                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                  {order.car_brand && (
+                                    <span>{order.car_brand} {order.car_model} {order.car_number}</span>
+                                  )}
+                                  {order.driver_phone && (
+                                    <a href={`tel:${order.driver_phone}`} className="text-blue-600 flex items-center gap-0.5">
+                                      <Icon name="Phone" className="h-3 w-3" />
+                                      {order.driver_phone}
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Order footer */}
+                          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border">
+                            <span>Заказ #{order.id}</span>
+                            <span>{formatDate(order.created_at)}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
 
           {/* ══ TAB: Rides ══ */}
           <TabsContent value="rides" className="mt-0">
@@ -1117,6 +1372,199 @@ const PassengerCabinet = () => {
                 {cancelLoading
                   ? <><Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />Отменяем...</>
                   : <><Icon name="X" className="h-4 w-4 mr-2" />Отменить</>
+                }
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ DIALOG: Create transfer order ════ */}
+      <Dialog open={orderDialog} onOpenChange={setOrderDialog}>
+        <DialogContent className="mx-3 rounded-2xl max-w-sm max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Заказать трансфер</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            {/* Direction (tariff) selector */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">
+                <Icon name="MapPin" className="inline h-3.5 w-3.5 mr-1 text-primary" />
+                Направление
+              </Label>
+              {tariffs.length > 0 ? (
+                <Select
+                  value={orderForm.tariff_id}
+                  onValueChange={v => {
+                    const t = tariffs.find(tt => tt.id === parseInt(v));
+                    setOrderForm(f => ({
+                      ...f,
+                      tariff_id: v,
+                      from_location: t ? 'Аэропорт Сочи' : f.from_location,
+                      to_location: t ? t.city : f.to_location,
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Выберите направление" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tariffs.map(t => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.city} — от {Number(t.price).toLocaleString('ru-RU')} ₽
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    className="h-11"
+                    placeholder="Откуда"
+                    value={orderForm.from_location}
+                    onChange={e => setOrderForm(f => ({ ...f, from_location: e.target.value }))}
+                  />
+                  <Input
+                    className="h-11"
+                    placeholder="Куда"
+                    value={orderForm.to_location}
+                    onChange={e => setOrderForm(f => ({ ...f, to_location: e.target.value }))}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Custom from/to when tariff selected */}
+            {orderForm.tariff_id && (
+              <div className="bg-muted/40 rounded-xl p-3 space-y-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                  <span className="font-medium">{orderForm.from_location}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                  <span className="text-muted-foreground">{orderForm.to_location}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Car class */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Класс автомобиля</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(carClasses.length > 0 ? carClasses : Object.entries(CAR_CLASS_LABELS).map(([v, l]) => ({ value: v, label: l, price_multiplier: 1 }))).map(cls => (
+                  <button
+                    key={cls.value}
+                    type="button"
+                    onClick={() => setOrderForm(f => ({ ...f, car_class: cls.value }))}
+                    className={`text-sm py-2.5 px-3 rounded-xl border-2 transition-colors font-medium text-left ${
+                      orderForm.car_class === cls.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border hover:bg-muted/50 text-muted-foreground'
+                    }`}
+                  >
+                    <span className="block">{cls.label}</span>
+                    {Number(cls.price_multiplier) !== 1 && (
+                      <span className="text-[10px] opacity-70">x{Number(cls.price_multiplier).toFixed(1)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date/time */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">
+                <Icon name="Calendar" className="inline h-3.5 w-3.5 mr-1 text-primary" />
+                Дата и время подачи
+              </Label>
+              <Input
+                className="h-11"
+                type="datetime-local"
+                min={nowDatetimeLocal()}
+                value={orderForm.pickup_datetime}
+                onChange={e => setOrderForm(f => ({ ...f, pickup_datetime: e.target.value }))}
+              />
+            </div>
+
+            {/* Flight number & passengers */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">
+                  <Icon name="Plane" className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                  Рейс <span className="font-normal text-muted-foreground text-xs">(необяз.)</span>
+                </Label>
+                <Input
+                  className="h-11"
+                  placeholder="SU 1234"
+                  value={orderForm.flight_number}
+                  onChange={e => setOrderForm(f => ({ ...f, flight_number: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Пассажиров</Label>
+                <Select
+                  value={orderForm.passengers_count}
+                  onValueChange={v => setOrderForm(f => ({ ...f, passengers_count: v }))}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">
+                Комментарий <span className="font-normal text-muted-foreground">(необязательно)</span>
+              </Label>
+              <Textarea
+                placeholder="Детское кресло, встреча с табличкой..."
+                rows={2}
+                value={orderForm.notes}
+                onChange={e => setOrderForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+
+            {/* Price */}
+            {computedPrice > 0 && (
+              <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-4 py-3">
+                <span className="text-sm font-medium">Стоимость</span>
+                <span className="text-xl font-bold text-primary">
+                  {computedPrice.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+            )}
+
+            {/* Info */}
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/40 rounded-xl p-3">
+              <Icon name="Info" className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>После оплаты вам будет назначен водитель. Вы получите его контакты в этом разделе.</span>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 min-h-[48px]"
+                onClick={() => setOrderDialog(false)}
+              >
+                Отмена
+              </Button>
+              <Button
+                className="flex-1 gradient-primary text-white min-h-[48px] font-semibold"
+                onClick={handleCreateOrder}
+                disabled={orderLoading || computedPrice <= 0}
+              >
+                {orderLoading
+                  ? <><Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />Создаём...</>
+                  : <><Icon name="CreditCard" className="h-4 w-4 mr-2" />Оплатить и заказать</>
                 }
               </Button>
             </div>

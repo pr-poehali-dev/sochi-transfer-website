@@ -168,7 +168,7 @@ const DriverCabinet = () => {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
-  const [depositMethod, setDepositMethod] = useState<'admin' | 'sbp' | 'card'>('admin');
+  const [depositMethod, setDepositMethod] = useState<'yookassa' | 'admin' | 'sbp' | 'card'>('yookassa');
   const [depositLoading, setDepositLoading] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<Record<string, string>>({});
   const [chatOpenFor, setChatOpenFor] = useState<number | null>(null);
@@ -180,6 +180,14 @@ const DriverCabinet = () => {
     if (!driverId) { navigate('/driver/login'); return; }
     loadData();
   }, [driverId]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('topup') === 'success') {
+      toast({ title: 'Баланс пополнен!' });
+      window.history.replaceState({}, '', '/driver/cabinet');
+    }
+  }, []);
 
   useEffect(() => {
     if (!driver?.is_active) return;
@@ -254,6 +262,30 @@ const DriverCabinet = () => {
     if (!depositAmount || parseFloat(depositAmount) <= 0) {
       toast({ title: 'Укажите сумму', variant: 'destructive' }); return;
     }
+    if (depositMethod === 'yookassa') {
+      const amount = parseFloat(depositAmount);
+      if (!amount || amount < 100) {
+        toast({ title: 'Минимальная сумма 100 ₽', variant: 'destructive' }); return;
+      }
+      setDepositLoading(true);
+      try {
+        const res = await fetch(API_URLS.drivers, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Driver-Id': driverId || '' },
+          body: JSON.stringify({ action: 'topup_yookassa', amount }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Ошибка');
+        if (data.payment_url) {
+          window.location.href = data.payment_url;
+        }
+      } catch (err: unknown) {
+        toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
+      } finally {
+        setDepositLoading(false);
+      }
+      return;
+    }
     setDepositLoading(true);
     try {
       await fetch(API_URLS.balance, {
@@ -305,6 +337,22 @@ const DriverCabinet = () => {
       toast({ title: 'Ошибка принятия заказа', description: err instanceof Error ? err.message : 'Неизвестная ошибка', variant: 'destructive' });
     } finally {
       setAcceptingId(null);
+    }
+  };
+
+  const changeOrderStatus = async (orderId: number, status: 'arrived' | 'completed') => {
+    try {
+      const res = await fetch(API_URLS.drivers, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Driver-Id': driverId || '' },
+        body: JSON.stringify({ action: 'set_status', order_id: orderId, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка');
+      toast({ title: status === 'arrived' ? 'Статус: Прибыл' : 'Заказ завершён! Комиссия списана.' });
+      loadData();
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
     }
   };
 
@@ -656,6 +704,31 @@ const DriverCabinet = () => {
                           commissionRate={driver.commission_rate}
                         />
 
+                        {/* Order action buttons */}
+                        {order.status_name === 'Подтверждена' && (
+                          <Button
+                            className="w-full mt-3 bg-blue-500 hover:bg-blue-600 text-white min-h-[44px]"
+                            onClick={() => changeOrderStatus(order.id, 'arrived')}
+                          >
+                            <Icon name="MapPin" className="mr-2 h-4 w-4" />
+                            Прибыл на место
+                          </Button>
+                        )}
+                        {(order.status_name === 'Прибыл' || order.status_name === 'В пути') && (
+                          <Button
+                            className="w-full mt-3 bg-green-500 hover:bg-green-600 text-white min-h-[44px]"
+                            onClick={() => changeOrderStatus(order.id, 'completed')}
+                          >
+                            <Icon name="CheckCircle2" className="mr-2 h-4 w-4" />
+                            Завершить заказ
+                          </Button>
+                        )}
+                        {order.status_name === 'Завершена' && (
+                          <div className="mt-3 bg-green-50 dark:bg-green-950/30 rounded-lg p-2 text-center text-xs text-green-600 font-medium">
+                            Заказ завершён · Комиссия списана
+                          </div>
+                        )}
+
                         {/* Chat toggle */}
                         <button
                           className="mt-3 flex items-center gap-1.5 text-xs text-primary hover:underline"
@@ -718,11 +791,12 @@ const DriverCabinet = () => {
                             <Label className="text-sm mb-2 block">Способ пополнения</Label>
                             <div className="space-y-2">
                               {[
+                                { id: 'yookassa', label: 'Оплата картой (ЮKassa)', desc: 'Мгновенное пополнение через платёжную систему' },
                                 { id: 'admin', label: 'Через администратора', desc: 'Переведите средства и свяжитесь с поддержкой' },
                                 { id: 'sbp', label: 'СБП', desc: paymentSettings['sbp_phone'] ? `Телефон: ${paymentSettings['sbp_phone']}` : 'Настройте номер СБП в админ-панели' },
                                 { id: 'card', label: 'На карту', desc: paymentSettings['card_number'] ? `Карта: ${paymentSettings['card_number']}` : 'Настройте номер карты в админ-панели' },
                               ].map(m => (
-                                <button key={m.id} type="button" onClick={() => setDepositMethod(m.id as 'admin' | 'sbp' | 'card')}
+                                <button key={m.id} type="button" onClick={() => setDepositMethod(m.id as 'yookassa' | 'admin' | 'sbp' | 'card')}
                                   className={`w-full text-left p-3 rounded-lg border-2 transition-all ${depositMethod === m.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'}`}>
                                   <p className={`text-sm font-medium ${depositMethod === m.id ? 'text-primary' : ''}`}>{m.label}</p>
                                   <p className="text-xs text-muted-foreground">{m.desc}</p>
@@ -746,8 +820,11 @@ const DriverCabinet = () => {
                           )}
                           <Button className="w-full gradient-primary text-white min-h-[48px]" onClick={submitDeposit} disabled={depositLoading}>
                             {depositLoading && <Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />}
-                            Отправить заявку
+                            {depositMethod === 'yookassa' ? 'Перейти к оплате' : 'Отправить заявку'}
                           </Button>
+                          {depositMethod === 'yookassa' && (
+                            <p className="text-xs text-muted-foreground text-center">Минимальная сумма пополнения — 100 ₽</p>
+                          )}
                         </div>
                       </DialogContent>
                     </Dialog>

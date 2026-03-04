@@ -1,4 +1,4 @@
-"""Обработка уведомлений (webhook) от ЮKassa для заказов трансфера."""
+"""Обработка уведомлений (webhook) от ЮKassa для заказов трансфера и пополнений баланса."""
 import json
 import os
 import base64
@@ -36,8 +36,70 @@ def get_schema():
     return f"{schema}." if schema else ""
 
 
+def handle_driver_topup(cur, conn, S, metadata, payment_status, payment_id, now):
+    driver_id = metadata.get('driver_id')
+    deposit_id = metadata.get('deposit_id')
+    if not driver_id:
+        return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Missing driver_id'})}
+
+    if payment_status == 'succeeded':
+        cur.execute(f"SELECT amount FROM {S}deposit_requests WHERE id = %s AND status = 'pending'", (int(deposit_id),))
+        dep_row = cur.fetchone()
+        if not dep_row:
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'status': 'already_processed'})}
+
+        amount = float(dep_row[0])
+        cur.execute(f"UPDATE {S}drivers SET balance = balance + %s WHERE id = %s", (amount, int(driver_id)))
+        cur.execute(f"INSERT INTO {S}balance_transactions (driver_id, amount, type, description, status) VALUES (%s, %s, 'deposit', 'Пополнение баланса через ЮKassa (платёж %s)', 'completed')",
+                    (int(driver_id), amount, payment_id))
+        cur.execute(f"UPDATE {S}deposit_requests SET status = 'approved', admin_note = %s WHERE id = %s",
+                    (f'yookassa_payment_id:{payment_id}|auto_approved', int(deposit_id)))
+        conn.commit()
+
+    elif payment_status == 'canceled':
+        cur.execute(f"UPDATE {S}deposit_requests SET status = 'rejected', admin_note = %s WHERE id = %s",
+                    (f'yookassa_canceled:{payment_id}', int(deposit_id)))
+        conn.commit()
+
+    return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'status': 'ok', 'type': 'driver_topup'})}
+
+
+def handle_order_payment(cur, conn, S, metadata, payment_status, payment_id, now):
+    cur.execute(f"SELECT id, status_id FROM {S}orders WHERE yookassa_payment_id = %s", (payment_id,))
+    row = cur.fetchone()
+
+    if not row:
+        order_id_meta = metadata.get('order_id')
+        if order_id_meta:
+            cur.execute(f"SELECT id, status_id FROM {S}orders WHERE id = %s", (int(order_id_meta),))
+            row = cur.fetchone()
+
+    if not row:
+        return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Order not found'})}
+
+    order_id, current_status_id = row
+
+    if payment_status == 'succeeded':
+        cur.execute(f"""
+            UPDATE {S}orders
+            SET status_id = 2, paid_at = %s, payment_status = 'paid', updated_at = %s
+            WHERE id = %s AND status_id = 1
+        """, (now, now, order_id))
+        conn.commit()
+
+    elif payment_status == 'canceled':
+        cur.execute(f"""
+            UPDATE {S}orders
+            SET status_id = 5, payment_status = 'canceled', updated_at = %s
+            WHERE id = %s AND status_id = 1
+        """, (now, order_id))
+        conn.commit()
+
+    return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'status': 'ok'})}
+
+
 def handler(event, context):
-    """Обработка webhook от ЮKassa — обновление статуса заказа трансфера."""
+    """Обработка webhook от ЮKassa — обновление статуса заказа или пополнение баланса водителя."""
     if event.get('httpMethod') != 'POST':
         return {'statusCode': 405, 'headers': HEADERS, 'body': json.dumps({'error': 'Method not allowed'})}
 
@@ -72,37 +134,10 @@ def handler(event, context):
         cur = conn.cursor()
         now = datetime.utcnow().isoformat()
 
-        cur.execute(f"SELECT id, status_id FROM {S}orders WHERE yookassa_payment_id = %s", (payment_id,))
-        row = cur.fetchone()
+        if metadata.get('type') == 'driver_topup':
+            return handle_driver_topup(cur, conn, S, metadata, payment_status, payment_id, now)
 
-        if not row:
-            order_id_meta = metadata.get('order_id')
-            if order_id_meta:
-                cur.execute(f"SELECT id, status_id FROM {S}orders WHERE id = %s", (int(order_id_meta),))
-                row = cur.fetchone()
-
-        if not row:
-            return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Order not found'})}
-
-        order_id, current_status_id = row
-
-        if payment_status == 'succeeded':
-            cur.execute(f"""
-                UPDATE {S}orders
-                SET status_id = 2, paid_at = %s, updated_at = %s
-                WHERE id = %s AND status_id = 1
-            """, (now, now, order_id))
-            conn.commit()
-
-        elif payment_status == 'canceled':
-            cur.execute(f"""
-                UPDATE {S}orders
-                SET status_id = 5, updated_at = %s
-                WHERE id = %s AND status_id = 1
-            """, (now, order_id))
-            conn.commit()
-
-        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'status': 'ok'})}
+        return handle_order_payment(cur, conn, S, metadata, payment_status, payment_id, now)
 
     except Exception:
         conn.rollback()

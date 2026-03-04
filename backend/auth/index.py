@@ -1,6 +1,7 @@
 import json
 import os
 import psycopg2
+
 import hashlib
 import secrets
 import base64
@@ -444,6 +445,112 @@ def handle_drivers(method, event, params, data, headers):
             cur.execute(f"DELETE FROM {SCHEMA}.site_settings WHERE key=%s", (f'reset_code_driver_{phone}',))
             conn.commit(); cur.close(); conn.close()
             return resp(200, {'message': 'Пароль изменён'})
+        elif action == 'set_status' and driver_id:
+            order_id = data.get('order_id')
+            new_status = data.get('status')  # 'arrived' or 'completed'
+            status_map = {'arrived': 6, 'completed': 4}
+            status_id = status_map.get(new_status)
+            if not status_id or not order_id:
+                return resp(400, {'error': 'Укажите order_id и status (arrived/completed)'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT id, price, status_id, payment_type FROM {SCHEMA}.orders WHERE id=%s AND driver_id=%s", (int(order_id), int(driver_id)))
+            order = cur.fetchone()
+            if not order:
+                cur.close(); conn.close()
+                return resp(404, {'error': 'Заказ не найден или не назначен вам'})
+            
+            if new_status == 'completed':
+                price = float(order[1] or 0)
+                payment_type = order[3] or 'cash'
+                cur.execute(f"SELECT commission_rate FROM {SCHEMA}.drivers WHERE id=%s", (int(driver_id),))
+                commission_rate = float((cur.fetchone() or [15])[0])
+                commission = round(price * commission_rate / 100, 2)
+                driver_amount = round(price - commission, 2)
+                
+                if payment_type in ('full', 'prepay'):
+                    cur.execute(f"UPDATE {SCHEMA}.drivers SET balance=balance+%s WHERE id=%s", (driver_amount, int(driver_id)))
+                    cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (driver_id,amount,type,description,status) VALUES (%s,%s,'order_income','Доход за заказ #%s (минус комиссия %s%%): %s ₽','completed')",
+                                (int(driver_id), driver_amount, int(order_id), commission_rate, driver_amount))
+                    cur.execute(f"INSERT INTO {SCHEMA}.balance_transactions (driver_id,amount,type,description,status) VALUES (%s,%s,'commission','Комиссия за заказ #%s (%s%%): -%s ₽','completed')",
+                                (int(driver_id), -commission, int(order_id), commission_rate, commission))
+                
+                cur.execute(f"UPDATE {SCHEMA}.orders SET status_id=4, commission_amount=%s, driver_amount=%s, payment_status='completed', updated_at=NOW() WHERE id=%s",
+                            (commission, driver_amount, int(order_id)))
+            else:
+                cur.execute(f"UPDATE {SCHEMA}.orders SET status_id=%s, updated_at=NOW() WHERE id=%s", (status_id, int(order_id)))
+            
+            conn.commit(); cur.close(); conn.close()
+            return resp(200, {'message': 'Статус обновлён', 'new_status': new_status})
+        elif action == 'topup_yookassa' and driver_id:
+            amount = float(data.get('amount', 0))
+            if amount < 100:
+                return resp(400, {'error': 'Минимальная сумма пополнения 100 ₽'})
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT name, callsign FROM {SCHEMA}.drivers WHERE id=%s", (int(driver_id),))
+            driver_row = cur.fetchone()
+            if not driver_row:
+                cur.close(); conn.close()
+                return resp(404, {'error': 'Водитель не найден'})
+            driver_name = driver_row[0]
+            callsign = driver_row[1] or ''
+            
+            cur.execute(f"INSERT INTO {SCHEMA}.deposit_requests (driver_id, amount, payment_method, status) VALUES (%s,%s,'yookassa','pending') RETURNING id",
+                        (int(driver_id), amount))
+            deposit_id = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            
+            import urllib.request as urllib2
+            site_settings = {}
+            try:
+                conn2 = get_conn(); cur2 = conn2.cursor()
+                cur2.execute(f"SELECT key, value FROM {SCHEMA}.site_settings")
+                site_settings = {r[0]: r[1] for r in cur2.fetchall()}
+                cur2.close(); conn2.close()
+            except: pass
+            
+            shop_id = os.environ.get('YOOKASSA_SHOP_ID', '') or site_settings.get('yookassa_shop_id', '')
+            secret_key = os.environ.get('YOOKASSA_SECRET_KEY', '')
+            if not shop_id or not secret_key:
+                return resp(400, {'error': 'ЮKassa не настроена'})
+            
+            description = f'Пополнение баланса водителя {driver_name}'
+            if callsign:
+                description += f' (позывной: {callsign})'
+            
+            base_url = site_settings.get('site_url', 'https://transfer-abkhazia.ru')
+            return_url = f"{base_url}/driver/cabinet?topup=success&deposit_id={deposit_id}"
+            
+            idempotence_key = secrets.token_urlsafe(16)
+            payload = json.dumps({
+                'amount': {'value': f'{amount:.2f}', 'currency': 'RUB'},
+                'capture': True,
+                'confirmation': {'type': 'redirect', 'return_url': return_url},
+                'description': description,
+                'metadata': {'deposit_id': deposit_id, 'driver_id': int(driver_id), 'type': 'driver_topup'},
+            }).encode()
+            credentials = base64.b64encode(f'{shop_id}:{secret_key}'.encode()).decode()
+            req = urllib2.Request(
+                'https://api.yookassa.ru/v3/payments',
+                data=payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Basic {credentials}',
+                    'Idempotence-Key': idempotence_key,
+                }
+            )
+            try:
+                with urllib2.urlopen(req, timeout=15) as response:
+                    result = json.loads(response.read())
+                    payment_url = result.get('confirmation', {}).get('confirmation_url')
+                    payment_id = result.get('id')
+                    
+                    conn3 = get_conn(); cur3 = conn3.cursor()
+                    cur3.execute(f"UPDATE {SCHEMA}.deposit_requests SET admin_note=%s WHERE id=%s", (f'yookassa_payment_id:{payment_id}', deposit_id))
+                    conn3.commit(); cur3.close(); conn3.close()
+                    
+                    return resp(200, {'payment_url': payment_url, 'payment_id': payment_id, 'deposit_id': deposit_id})
+            except Exception as e:
+                return resp(500, {'error': f'Ошибка создания платежа: {str(e)}'})
     elif method == 'GET':
         action = params.get('action', 'profile')
         if action == 'profile' and driver_id:
@@ -453,7 +560,7 @@ def handle_drivers(method, event, params, data, headers):
                        passport_photo_url,license_front_url,license_back_url,
                        car_tech_passport_front_url,car_tech_passport_back_url,car_photos_urls,
                        status,is_active,is_online,balance,commission_rate,rating,total_orders,
-                       driver_type,car_category,identity_verified,created_at
+                       driver_type,car_category,identity_verified,created_at,callsign
                 FROM {SCHEMA}.drivers WHERE id=%s
             ''', (int(driver_id),))
             row = cur.fetchone()
@@ -463,7 +570,7 @@ def handle_drivers(method, event, params, data, headers):
                     'passport_photo_url','license_front_url','license_back_url',
                     'car_tech_passport_front_url','car_tech_passport_back_url','car_photos_urls',
                     'status','is_active','is_online','balance','commission_rate','rating','total_orders',
-                    'driver_type','car_category','identity_verified','created_at']
+                    'driver_type','car_category','identity_verified','created_at','callsign']
             cur.close(); conn.close()
             return resp(200, {'driver': dict(zip(cols, row))})
         elif action == 'orders' and driver_id:
@@ -500,7 +607,7 @@ def handle_drivers(method, event, params, data, headers):
                        status,is_active,is_online,balance,commission_rate,rating,total_orders,
                        driver_type,car_category,identity_verified,created_at,
                        passport_photo_url,license_front_url,license_back_url,
-                       car_tech_passport_front_url,car_tech_passport_back_url,car_photos_urls,identity_doc_url
+                       car_tech_passport_front_url,car_tech_passport_back_url,car_photos_urls,identity_doc_url,callsign
                 FROM {SCHEMA}.drivers ORDER BY created_at DESC
             ''')
             cols = [d[0] for d in cur.description]
@@ -531,6 +638,9 @@ def handle_drivers(method, event, params, data, headers):
             if data_put.get('questionnaire') is not None:
                 set_clauses.insert(-1, 'questionnaire=%s')
                 values.append(json.dumps(data_put.get('questionnaire')))
+            if data_put.get('callsign') is not None:
+                set_clauses.insert(-1, 'callsign=%s')
+                values.append(data_put.get('callsign'))
             values.append(int(did))
             cur.execute(f"UPDATE {SCHEMA}.drivers SET {', '.join(set_clauses)} WHERE id=%s", values)
         elif action == 'update':
@@ -538,7 +648,7 @@ def handle_drivers(method, event, params, data, headers):
             set_clauses = ['updated_at=NOW()']
             values = []
             for field in ['name', 'phone', 'email', 'car_brand', 'car_model', 'car_color',
-                          'car_number', 'car_number_country', 'status', 'driver_type', 'car_category']:
+                          'car_number', 'car_number_country', 'status', 'driver_type', 'car_category', 'callsign']:
                 if data_put.get(field) is not None:
                     set_clauses.insert(-1, f'{field}=%s')
                     values.append(data_put.get(field))
