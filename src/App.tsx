@@ -19,6 +19,7 @@ import PassengerCabinet from "./pages/PassengerCabinet";
 import PushNotificationBanner from "./components/PushNotificationBanner";
 import BecomeDriverPage from "./pages/BecomeDriverPage";
 import TariffsPage from "./pages/TariffsPage";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import { API_URLS } from "./config/api";
 import { Button } from "@/components/ui/button";
 
@@ -64,6 +65,7 @@ const AppContent = () => {
         <Route path="/driver/login" element={<DriverLogin />} />
         <Route path="/driver/cabinet" element={<DriverCabinet />} />
         <Route path="/tariffs" element={<TariffsPage />} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/news" element={<NewsPage />} />
         <Route path="/passenger" element={<PassengerCabinet />} />
         <Route path="/admin/login" element={<AdminLogin />} />

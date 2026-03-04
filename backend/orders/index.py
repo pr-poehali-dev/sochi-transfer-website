@@ -310,7 +310,8 @@ def handle_orders(method, event):
                 pay_amount = round(pay_amount * prepay_pct / 100, 2)
             description = f'Трансфер {data.get("from_location")} → {data.get("to_location")}'
             if provider == 'yookassa':
-                return_url = site_settings.get('site_url', 'https://transfer-abkhazia.ru') + '/profile'
+                base_url = site_settings.get('site_url', 'https://transfer-abkhazia.ru')
+                return_url = f"{base_url}/payment/success?order_id={oid}"
                 payment_info = generate_yookassa_payment(oid, pay_amount, description, return_url, site_settings)
                 if payment_info.get('payment_id'):
                     try:
