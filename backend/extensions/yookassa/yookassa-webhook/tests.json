@@ -1,0 +1,1 @@
+{"tests": [{"name": "Reject GET", "method": "GET", "path": "/", "expectedStatus": 405, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"}, {"name": "Missing payment id", "method": "POST", "path": "/", "body": {"event": "payment.succeeded", "object": {}}, "expectedStatus": 400, "expectedBody": {"error": "string"}, "bodyMatcher": "partial"}]}

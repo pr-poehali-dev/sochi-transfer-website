@@ -137,7 +137,7 @@ def send_push_to_user(user_id: int, title: str, body: str, url: str = '/profile'
 
 
 def generate_yookassa_payment(order_id: int, amount: float, description: str, return_url: str, settings: dict) -> dict:
-    shop_id = settings.get('yookassa_shop_id', '')
+    shop_id = os.environ.get('YOOKASSA_SHOP_ID', '') or settings.get('yookassa_shop_id', '')
     secret_key = os.environ.get('YOOKASSA_SECRET_KEY', '')
     if not shop_id or not secret_key:
         return {'error': 'ЮКасса не настроена'}
@@ -301,7 +301,6 @@ def handle_orders(method, event):
         send_telegram_notification(data, oid)
         send_email_notification(data, oid, site_settings)
 
-        # Генерируем ссылку на оплату если выбран онлайн-провайдер
         payment_info = {}
         provider = site_settings.get('payment_provider', 'none')
         if data.get('payment_type') in ('full', 'prepay') and provider != 'none':
@@ -313,6 +312,14 @@ def handle_orders(method, event):
             if provider == 'yookassa':
                 return_url = site_settings.get('site_url', 'https://transfer-abkhazia.ru') + '/profile'
                 payment_info = generate_yookassa_payment(oid, pay_amount, description, return_url, site_settings)
+                if payment_info.get('payment_id'):
+                    try:
+                        conn2 = get_conn(); cur2 = conn2.cursor()
+                        cur2.execute(f"UPDATE {SCHEMA}.orders SET yookassa_payment_id=%s, payment_url=%s WHERE id=%s",
+                                     (payment_info['payment_id'], payment_info.get('payment_url', ''), oid))
+                        conn2.commit(); cur2.close(); conn2.close()
+                    except Exception:
+                        pass
             elif provider == 'robokassa':
                 payment_info = generate_robokassa_payment(oid, pay_amount, description, site_settings)
 
