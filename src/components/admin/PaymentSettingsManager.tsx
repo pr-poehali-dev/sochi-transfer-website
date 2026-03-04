@@ -267,6 +267,23 @@ const PaymentSettingsManager = () => {
               </div>
             </div>
 
+            <div className="p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50">
+              <div className="flex items-start gap-3">
+                <Icon name="Link" className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">URL для уведомлений (Webhook)</p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Укажите этот адрес в кабинете ЮКасса → <strong>HTTP-уведомления</strong>. Отметьте все чекбоксы событий.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <code className="font-mono text-xs bg-blue-100 border border-blue-300 rounded px-2 py-1 text-blue-900 break-all select-all">
+                      https://functions.poehali.dev/f947d025-0ddf-4263-9b8f-ad4b846e5cfd
+                    </code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="p-3 bg-muted/50 rounded-lg text-sm">
               <p className="font-medium mb-1">Статус ЮКасса:</p>
               <div className="flex items-center gap-2">
