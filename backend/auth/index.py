@@ -761,8 +761,8 @@ def handle_settings(method, event, params, data):
 
 
 def handle_balance(method, event, params, data, headers):
-    user_id = headers.get('X-User-Id') or params.get('user_id')
-    driver_id = headers.get('X-Driver-Id') or params.get('driver_id')
+    user_id = headers.get('X-User-Id') or params.get('user_id') or data.get('user_id')
+    driver_id = headers.get('X-Driver-Id') or params.get('driver_id') or data.get('driver_id')
     conn = get_conn(); cur = conn.cursor()
 
     if method == 'GET':
@@ -827,6 +827,61 @@ def handle_balance(method, event, params, data, headers):
             dep_id = cur.fetchone()[0]
             conn.commit(); cur.close(); conn.close()
             return resp(201, {'id': dep_id, 'message': 'Заявка на пополнение создана'})
+
+        elif action == 'topup_yookassa':
+            if amount < 100:
+                cur.close(); conn.close()
+                return resp(400, {'error': 'Минимальная сумма 100 ₽'})
+            cur.execute(f"INSERT INTO {SCHEMA}.deposit_requests (user_id,driver_id,amount,payment_method,status) VALUES (%s,%s,%s,'yookassa','pending') RETURNING id",
+                        (uid, did, amount))
+            dep_id = cur.fetchone()[0]
+            conn.commit()
+            site_settings = {}
+            try:
+                cur.execute(f"SELECT key, value FROM {SCHEMA}.site_settings")
+                site_settings = {r[0]: r[1] for r in cur.fetchall()}
+            except: pass
+            cur.close(); conn.close()
+            shop_id = os.environ.get('YOOKASSA_SHOP_ID', '') or site_settings.get('yookassa_shop_id', '')
+            secret_key = os.environ.get('YOOKASSA_SECRET_KEY', '')
+            if not shop_id or not secret_key:
+                return resp(400, {'error': 'ЮKassa не настроена'})
+            who = 'пассажира' if uid else 'водителя'
+            description = f'Пополнение баланса {who}'
+            base_url = site_settings.get('site_url', 'https://transfer-abkhazia.ru')
+            if uid:
+                return_url = f"{base_url}/passenger?topup=success&deposit_id={dep_id}"
+            else:
+                return_url = f"{base_url}/driver/cabinet?topup=success&deposit_id={dep_id}"
+            idempotence_key = secrets.token_urlsafe(16)
+            payload = json.dumps({
+                'amount': {'value': f'{amount:.2f}', 'currency': 'RUB'},
+                'capture': True,
+                'confirmation': {'type': 'redirect', 'return_url': return_url},
+                'description': description,
+                'metadata': {'deposit_id': dep_id, 'user_id': uid, 'driver_id': did, 'type': 'balance_topup'},
+            }).encode()
+            credentials = base64.b64encode(f'{shop_id}:{secret_key}'.encode()).decode()
+            req = urllib.request.Request(
+                'https://api.yookassa.ru/v3/payments',
+                data=payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Basic {credentials}',
+                    'Idempotence-Key': idempotence_key,
+                }
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    result = json.loads(response.read())
+                    payment_url = result.get('confirmation', {}).get('confirmation_url')
+                    payment_id = result.get('id')
+                    conn2 = get_conn(); cur2 = conn2.cursor()
+                    cur2.execute(f"UPDATE {SCHEMA}.deposit_requests SET admin_note=%s WHERE id=%s", (f'yookassa_payment_id:{payment_id}', dep_id))
+                    conn2.commit(); cur2.close(); conn2.close()
+                    return resp(200, {'payment_url': payment_url, 'payment_id': payment_id, 'deposit_id': dep_id})
+            except Exception as e:
+                return resp(500, {'error': f'Ошибка создания платежа: {str(e)}'})
 
     elif method == 'PUT':
         action = data.get('action', '')

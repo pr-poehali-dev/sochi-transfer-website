@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { API_URLS } from '@/config/api';
 import Icon from '@/components/ui/icon';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import TariffsManager from '@/components/admin/TariffsManager';
 import FleetManager from '@/components/admin/FleetManager';
 import OrdersManager from '@/components/admin/OrdersManager';
@@ -47,12 +48,139 @@ interface Deposit {
   driver_phone?: string;
 }
 
+interface StatsType {
+  totalOrders: number;
+  newOrders: number;
+  activeTariffs: number;
+  activeFleet: number;
+  pendingDrivers: number;
+  activeRideshares: number;
+}
+
+const AnalyticsTab = ({ stats }: { stats: StatsType }) => {
+  const [analyticsData, setAnalyticsData] = useState<{orders_by_day: {date: string; count: number}[]; users_count: number; drivers_count: number; revenue_total: number; orders_completed: number; metrika_id: string}>({
+    orders_by_day: [], users_count: 0, drivers_count: 0, revenue_total: 0, orders_completed: 0, metrika_id: ''
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [ordersRes, usersRes, driversRes, settingsRes] = await Promise.all([
+          fetch(API_URLS.orders),
+          fetch(`${API_URLS.users}&action=list`),
+          fetch(`${API_URLS.drivers}&action=list`),
+          fetch(API_URLS.settings),
+        ]);
+        const oData = await ordersRes.json();
+        const uData = await usersRes.json();
+        const dData = await driversRes.json();
+        const sData = await settingsRes.json();
+
+        const orders = oData.orders || [];
+        const completedOrders = orders.filter((o: {status_id: number}) => o.status_id === 4);
+        const revenue = completedOrders.reduce((sum: number, o: {price: number}) => sum + Number(o.price || 0), 0);
+
+        const byDay: Record<string, number> = {};
+        orders.forEach((o: {created_at: string}) => {
+          const d = new Date(o.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+          byDay[d] = (byDay[d] || 0) + 1;
+        });
+        const last14 = Array.from({ length: 14 }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (13 - i));
+          return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+        }).map(date => ({ date, count: byDay[date] || 0 }));
+
+        setAnalyticsData({
+          orders_by_day: last14,
+          users_count: (uData.users || []).length,
+          drivers_count: (dData.drivers || []).filter((d: {is_active: boolean}) => d.is_active).length,
+          revenue_total: revenue,
+          orders_completed: completedOrders.length,
+          metrika_id: (sData.settings || {})['yandex_metrika_id'] || '',
+        });
+      } catch { /* silent */ }
+      finally { setLoading(false); }
+    };
+    load();
+  }, []);
+
+  if (loading) return <div className="flex justify-center py-16"><Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Пользователей', value: analyticsData.users_count, icon: 'Users', color: 'text-blue-600' },
+          { label: 'Водителей активных', value: analyticsData.drivers_count, icon: 'Car', color: 'text-green-600' },
+          { label: 'Заказов завершено', value: analyticsData.orders_completed, icon: 'CheckCircle2', color: 'text-primary' },
+          { label: 'Выручка (завершённые)', value: `${analyticsData.revenue_total.toLocaleString('ru-RU')} ₽`, icon: 'TrendingUp', color: 'text-amber-600' },
+        ].map((item, i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                  <p className="text-xl font-bold">{item.value}</p>
+                </div>
+                <Icon name={item.icon} className={`h-8 w-8 ${item.color} opacity-80`} />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle>Заказы за последние 14 дней</CardTitle></CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={analyticsData.orders_by_day}>
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" name="Заказов" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {analyticsData.metrika_id ? (
+        <Card>
+          <CardHeader><CardTitle>Яндекс.Метрика</CardTitle></CardHeader>
+          <CardContent>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              <p className="font-semibold mb-1">Яндекс.Метрика подключена (ID: {analyticsData.metrika_id})</p>
+              <p className="text-xs">Полная статистика посещений доступна в <a href={`https://metrika.yandex.ru/stat/traffic?id=${analyticsData.metrika_id}`} target="_blank" rel="noopener noreferrer" className="underline">Яндекс.Метрике</a></p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader><CardTitle>Аналитика посещений</CardTitle></CardHeader>
+          <CardContent>
+            <div className="p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+              <p className="font-semibold mb-2">Для отслеживания посещений сайта подключите Яндекс.Метрику:</p>
+              <ol className="list-decimal list-inside space-y-1 text-xs">
+                <li>Зайдите в <a href="https://metrika.yandex.ru" target="_blank" rel="noopener noreferrer" className="text-primary underline">metrika.yandex.ru</a></li>
+                <li>Добавьте счётчик для вашего сайта</li>
+                <li>Скопируйте ID счётчика (число)</li>
+                <li>Вставьте ID в <strong>Настройки → Яндекс.Метрика</strong></li>
+              </ol>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [adminName, setAdminName] = useState('');
   const [adminRole, setAdminRole] = useState('admin');
-  const [stats, setStats] = useState({ totalOrders: 0, newOrders: 0, activeTariffs: 0, activeFleet: 0, pendingDrivers: 0, activeRideshares: 0 });
+  const [stats, setStats] = useState<StatsType>({ totalOrders: 0, newOrders: 0, activeTariffs: 0, activeFleet: 0, pendingDrivers: 0, activeRideshares: 0 });
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
 
@@ -265,6 +393,10 @@ const AdminDashboard = () => {
                 <Icon name="Settings" className="mr-1.5 h-4 w-4" />
                 Настройки
               </TabsTrigger>
+              <TabsTrigger value="analytics">
+                <Icon name="BarChart3" className="mr-1.5 h-4 w-4" />
+                Статистика
+              </TabsTrigger>
               <TabsTrigger value="team">
                 <Icon name="UserCog" className="mr-1.5 h-4 w-4" />
                 Команда
@@ -413,6 +545,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="settings">
             <SiteSettingsManager />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <AnalyticsTab stats={stats} />
           </TabsContent>
         </Tabs>
       </div>

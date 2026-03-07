@@ -96,18 +96,33 @@ const TariffsPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [tRes, cRes] = await Promise.all([
+        const [tRes, cRes, sRes] = await Promise.all([
           fetch(`${API_URLS.tariffs}?active=true`),
           fetch(`${API_URLS.carClasses}&active=true`),
+          fetch(API_URLS.settings),
         ]);
         const tData = await tRes.json();
         const cData = await cRes.json();
+        const sData = await sRes.json();
 
         const loadedTariffs: Tariff[] = tData.tariffs || [];
         const loadedClasses: CarClass[] = cData.car_classes || [];
+        const s: Record<string, string> = sData.settings || {};
 
         setTariffs(loadedTariffs);
         if (loadedClasses.length > 0) setCarClasses(loadedClasses);
+
+        // Apply SEO
+        const pageTitle = s['tariffs_seo_title'] || s['site_title'] || 'Тарифы на трансфер';
+        document.title = pageTitle;
+        const metaDesc = document.querySelector('meta[name="description"]');
+        if (metaDesc) metaDesc.setAttribute('content', s['tariffs_seo_description'] || s['site_description'] || '');
+        const metaKw = document.querySelector('meta[name="keywords"]');
+        if (metaKw) metaKw.setAttribute('content', s['tariffs_seo_keywords'] || s['site_keywords'] || '');
+        const ogTitle = document.querySelector('meta[property="og:title"]');
+        if (ogTitle) ogTitle.setAttribute('content', pageTitle);
+        const ogDesc = document.querySelector('meta[property="og:description"]');
+        if (ogDesc) ogDesc.setAttribute('content', s['tariffs_seo_description'] || s['site_description'] || '');
 
         // Default calculator selection
         if (loadedTariffs.length > 0) setCalcTariffId(loadedTariffs[0].id);
@@ -118,6 +133,7 @@ const TariffsPage = () => {
       }
     };
     load();
+    return () => { document.title = 'ПоехалиПро'; };
   }, []);
 
   // Calculator derived values

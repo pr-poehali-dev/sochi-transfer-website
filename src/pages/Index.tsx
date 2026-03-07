@@ -281,7 +281,7 @@ const Index = () => {
 
         {/* ── Mobile slide-down menu ── */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 top-16 z-40 bg-background/98 backdrop-blur-md overflow-y-auto">
+          <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-background/98 backdrop-blur-md overflow-y-auto" style={{ top: '64px', WebkitOverflowScrolling: 'touch' }}>
             <div className="px-4 py-4 space-y-1 max-w-lg mx-auto">
 
               {/* Section scroll links */}

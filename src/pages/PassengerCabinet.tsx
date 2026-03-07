@@ -375,7 +375,21 @@ const PassengerCabinet = () => {
     tariff_id: '',
     car_class: 'comfort',
     notes: '',
+    payment_type: 'online',
   });
+  const [paymentSettings, setPaymentSettings] = useState<{payment_provider?: string; allow_cash?: boolean}>({});
+
+  // Wallet state
+  const [userBalance, setUserBalance] = useState(0);
+  const [walletTransactions, setWalletTransactions] = useState<{id:number;amount:number;type:string;description:string;status:string;created_at:string}[]>([]);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [topupDialog, setTopupDialog] = useState(false);
+  const [topupAmount, setTopupAmount] = useState('');
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [withdrawDialog, setWithdrawDialog] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawRequisites, setWithdrawRequisites] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -401,14 +415,17 @@ const PassengerCabinet = () => {
 
   const loadTariffs = useCallback(async () => {
     try {
-      const [tRes, ccRes] = await Promise.all([
+      const [tRes, ccRes, psRes] = await Promise.all([
         fetch(`${API_URLS.tariffs}?active=true`),
         fetch(`${API_URLS.carClasses}&active=true`),
+        fetch(API_URLS.paymentSettings),
       ]);
       const tData = await tRes.json();
       const ccData = await ccRes.json();
+      const psData = await psRes.json();
       setTariffs(tData.tariffs || []);
       if (ccData.car_classes?.length) setCarClasses(ccData.car_classes);
+      if (psData.settings) setPaymentSettings(psData.settings);
     } catch { /* ignore */ }
   }, []);
 
@@ -422,6 +439,21 @@ const PassengerCabinet = () => {
     } catch { /* ignore */ }
   }, []);
 
+  const loadWallet = useCallback(async (uid: string) => {
+    setWalletLoading(true);
+    try {
+      const [profRes, txRes] = await Promise.all([
+        fetch(`${API_URLS.users}&action=profile`, { headers: { 'X-User-Id': uid } }),
+        fetch(`${API_URLS.balance}&action=transactions&user_id=${uid}`),
+      ]);
+      const profData = await profRes.json();
+      const txData = await txRes.json();
+      if (profData.user) setUserBalance(Number(profData.user.balance || 0));
+      setWalletTransactions(txData.transactions || []);
+    } catch { /* ignore */ }
+    finally { setWalletLoading(false); }
+  }, []);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     const uid = readStorage(STORAGE_KEYS.id);
@@ -430,14 +462,25 @@ const PassengerCabinet = () => {
     if (uid) {
       promises.push(loadBookings(uid));
       promises.push(loadTransferOrders(uid));
+      promises.push(loadWallet(uid));
     }
     await Promise.all(promises);
     setLoading(false);
-  }, [loadRides, loadBookings, loadTariffs, loadTransferOrders]);
+  }, [loadRides, loadBookings, loadTariffs, loadTransferOrders, loadWallet]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('topup') === 'success') {
+      toast({ title: 'Кошелёк пополнен!' });
+      window.history.replaceState({}, '', '/passenger');
+      const uid = readStorage(STORAGE_KEYS.id);
+      if (uid) loadWallet(uid);
+    }
+  }, []);
 
   // ── Auth handlers ─────────────────────────────────────────────────────────
 
@@ -565,6 +608,61 @@ const PassengerCabinet = () => {
     }
   };
 
+  // ── Wallet: topup & withdraw ─────────────────────────────────────────────
+
+  const handleTopup = async () => {
+    const amount = parseFloat(topupAmount);
+    if (!amount || amount < 100) {
+      toast({ title: 'Минимальная сумма 100 ₽', variant: 'destructive' }); return;
+    }
+    setTopupLoading(true);
+    try {
+      const res = await fetch(API_URLS.balance, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+        body: JSON.stringify({ action: 'topup_yookassa', amount, user_id: parseInt(userId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка');
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
+      }
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
+    } finally {
+      setTopupLoading(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0 || !withdrawRequisites.trim()) {
+      toast({ title: 'Укажите сумму и реквизиты', variant: 'destructive' }); return;
+    }
+    if (amount > userBalance) {
+      toast({ title: 'Недостаточно средств на балансе', variant: 'destructive' }); return;
+    }
+    setWithdrawLoading(true);
+    try {
+      const res = await fetch(API_URLS.balance, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
+        body: JSON.stringify({ action: 'withdraw', amount, requisites: withdrawRequisites, user_id: parseInt(userId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка');
+      toast({ title: 'Заявка на вывод отправлена', description: 'Обработаем в течение 1-2 рабочих дней' });
+      setWithdrawDialog(false);
+      setWithdrawAmount('');
+      setWithdrawRequisites('');
+      if (userId) loadWallet(userId);
+    } catch (err: unknown) {
+      toast({ title: err instanceof Error ? err.message : 'Ошибка', variant: 'destructive' });
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
   // ── Create transfer order ────────────────────────────────────────────────
 
   const computedPrice = (() => {
@@ -582,10 +680,12 @@ const PassengerCabinet = () => {
     if (!orderForm.pickup_datetime) {
       toast({ title: 'Укажите дату и время', variant: 'destructive' }); return;
     }
-
     if (computedPrice <= 0) {
       toast({ title: 'Выберите направление для расчёта цены', variant: 'destructive' }); return;
     }
+
+    const isCash = orderForm.payment_type === 'cash';
+    const hasOnlinePayment = paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none';
 
     setOrderLoading(true);
     try {
@@ -600,9 +700,9 @@ const PassengerCabinet = () => {
           passenger_name: userName,
           passenger_phone: userPhone,
           user_id: parseInt(userId),
-          payment_type: 'full',
+          payment_type: isCash ? 'cash' : 'full',
           transfer_type: 'individual',
-          force_payment: true,
+          force_payment: !isCash && !!hasOnlinePayment,
         }),
       });
       const data = await res.json();
@@ -611,7 +711,7 @@ const PassengerCabinet = () => {
       if (data.payment_url) {
         window.location.href = data.payment_url;
       } else {
-        toast({ title: `Заказ #${data.id} создан!` });
+        toast({ title: `Заказ #${data.id} создан!`, description: isCash ? 'Оплата — наличными при встрече' : 'Водитель свяжется с вами' });
         setOrderDialog(false);
         if (userId) loadTransferOrders(userId);
       }
@@ -731,6 +831,16 @@ const PassengerCabinet = () => {
                   </span>
                 )}
               </TabsTrigger>
+              {isAuth && (
+                <TabsTrigger
+                  value="wallet"
+                  className="text-xs px-4 h-8 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm whitespace-nowrap"
+                  onClick={() => { if (userId) loadWallet(userId); }}
+                >
+                  <Icon name="Wallet" className="h-3.5 w-3.5 mr-1.5" />
+                  Кошелёк
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -1064,6 +1174,78 @@ const PassengerCabinet = () => {
               </div>
             )}
           </TabsContent>
+
+          {/* ══ TAB: Wallet ══ */}
+          <TabsContent value="wallet" className="mt-0">
+            {walletLoading ? (
+              <div className="flex justify-center py-16">
+                <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Balance card */}
+                <Card className="gradient-primary text-white border-0">
+                  <CardContent className="p-5">
+                    <p className="text-sm opacity-80 mb-1">Баланс кошелька</p>
+                    <div className="text-3xl font-bold">{userBalance.toLocaleString('ru-RU')} ₽</div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        size="sm"
+                        className="bg-white/20 hover:bg-white/30 text-white border-0 min-h-[40px] flex-1"
+                        onClick={() => setTopupDialog(true)}
+                      >
+                        <Icon name="Plus" className="h-4 w-4 mr-1.5" />
+                        Пополнить
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-white/40 text-white hover:bg-white/20 min-h-[40px] flex-1"
+                        onClick={() => setWithdrawDialog(true)}
+                        disabled={userBalance <= 0}
+                      >
+                        <Icon name="ArrowDownToLine" className="h-4 w-4 mr-1.5" />
+                        Вывести
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Transactions */}
+                <div>
+                  <p className="text-sm font-semibold mb-2 text-muted-foreground">История операций</p>
+                  {walletTransactions.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-10 text-center text-muted-foreground text-sm">
+                        Операций пока нет
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-2">
+                      {walletTransactions.map(tx => (
+                        <Card key={tx.id}>
+                          <CardContent className="p-3 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${tx.amount > 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                                <Icon name={tx.amount > 0 ? 'TrendingUp' : 'TrendingDown'} className={`h-4 w-4 ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium leading-tight truncate">{tx.description || tx.type}</p>
+                                <p className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</p>
+                              </div>
+                            </div>
+                            <span className={`text-sm font-bold shrink-0 ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {tx.amount > 0 ? '+' : ''}{Number(tx.amount).toLocaleString('ru-RU')} ₽
+                            </span>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -1379,6 +1561,107 @@ const PassengerCabinet = () => {
         </DialogContent>
       </Dialog>
 
+      {/* ════ DIALOG: Topup ════ */}
+      <Dialog open={topupDialog} onOpenChange={setTopupDialog}>
+        <DialogContent className="mx-3 rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Пополнить кошелёк</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Сумма пополнения (₽)</Label>
+              <Input
+                className="h-11"
+                type="number"
+                inputMode="numeric"
+                min="100"
+                placeholder="Минимум 100 ₽"
+                value={topupAmount}
+                onChange={e => setTopupAmount(e.target.value)}
+              />
+              <div className="flex gap-2 mt-1">
+                {[500, 1000, 2000, 5000].map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setTopupAmount(String(v))}
+                    className={`flex-1 text-xs py-1.5 rounded-lg border transition-colors ${topupAmount === String(v) ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted/50'}`}
+                  >
+                    {v.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/40 rounded-xl p-3">
+              <Icon name="CreditCard" className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>Оплата картой через ЮКасса. Вы будете перенаправлены на страницу оплаты.</span>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 min-h-[48px]" onClick={() => setTopupDialog(false)}>Отмена</Button>
+              <Button
+                className="flex-1 gradient-primary text-white min-h-[48px] font-semibold"
+                onClick={handleTopup}
+                disabled={topupLoading}
+              >
+                {topupLoading
+                  ? <><Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />Подождите...</>
+                  : <><Icon name="CreditCard" className="h-4 w-4 mr-2" />Перейти к оплате</>
+                }
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ════ DIALOG: Withdraw ════ */}
+      <Dialog open={withdrawDialog} onOpenChange={setWithdrawDialog}>
+        <DialogContent className="mx-3 rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Вывод средств</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="p-3 bg-muted/50 rounded-xl text-sm">
+              Доступно: <span className="font-bold text-primary">{userBalance.toLocaleString('ru-RU')} ₽</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Сумма (₽)</Label>
+              <Input
+                className="h-11"
+                type="number"
+                inputMode="numeric"
+                min="100"
+                max={userBalance}
+                placeholder="Сумма для вывода"
+                value={withdrawAmount}
+                onChange={e => setWithdrawAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Реквизиты для перевода</Label>
+              <Textarea
+                placeholder="Номер карты / телефон для СБП / реквизиты банка..."
+                rows={3}
+                value={withdrawRequisites}
+                onChange={e => setWithdrawRequisites(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 min-h-[48px]" onClick={() => setWithdrawDialog(false)}>Отмена</Button>
+              <Button
+                className="flex-1 gradient-primary text-white min-h-[48px] font-semibold"
+                onClick={handleWithdraw}
+                disabled={withdrawLoading}
+              >
+                {withdrawLoading
+                  ? <><Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />Отправляем...</>
+                  : <><Icon name="ArrowDownToLine" className="h-4 w-4 mr-2" />Подать заявку</>
+                }
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ════ DIALOG: Create transfer order ════ */}
       <Dialog open={orderDialog} onOpenChange={setOrderDialog}>
         <DialogContent className="mx-3 rounded-2xl max-w-sm max-h-[92vh] overflow-y-auto">
@@ -1532,6 +1815,39 @@ const PassengerCabinet = () => {
               />
             </div>
 
+            {/* Payment type */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Способ оплаты</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none' && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderForm(f => ({ ...f, payment_type: 'online' }))}
+                    className={`text-sm py-2.5 px-3 rounded-xl border-2 transition-colors font-medium flex items-center gap-2 ${
+                      orderForm.payment_type === 'online'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border hover:bg-muted/50 text-muted-foreground'
+                    }`}
+                  >
+                    <Icon name="CreditCard" className="h-4 w-4 shrink-0" />
+                    Онлайн
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOrderForm(f => ({ ...f, payment_type: 'cash' }))}
+                  className={`text-sm py-2.5 px-3 rounded-xl border-2 transition-colors font-medium flex items-center gap-2 ${
+                    orderForm.payment_type === 'cash'
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border hover:bg-muted/50 text-muted-foreground'
+                  }`}
+                >
+                  <Icon name="Banknote" className="h-4 w-4 shrink-0" />
+                  Наличными
+                </button>
+              </div>
+            </div>
+
             {/* Price */}
             {computedPrice > 0 && (
               <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-4 py-3">
@@ -1545,7 +1861,12 @@ const PassengerCabinet = () => {
             {/* Info */}
             <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/40 rounded-xl p-3">
               <Icon name="Info" className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-              <span>После оплаты вам будет назначен водитель. Вы получите его контакты в этом разделе.</span>
+              <span>
+                {orderForm.payment_type === 'cash'
+                  ? 'Оплата наличными при встрече с водителем.'
+                  : 'После оплаты вам будет назначен водитель. Вы получите его контакты в этом разделе.'
+                }
+              </span>
             </div>
 
             {/* Buttons */}
@@ -1564,7 +1885,9 @@ const PassengerCabinet = () => {
               >
                 {orderLoading
                   ? <><Icon name="Loader2" className="h-4 w-4 animate-spin mr-2" />Создаём...</>
-                  : <><Icon name="CreditCard" className="h-4 w-4 mr-2" />Оплатить и заказать</>
+                  : orderForm.payment_type === 'cash'
+                    ? <><Icon name="Banknote" className="h-4 w-4 mr-2" />Заказать</>
+                    : <><Icon name="CreditCard" className="h-4 w-4 mr-2" />Оплатить и заказать</>
                 }
               </Button>
             </div>

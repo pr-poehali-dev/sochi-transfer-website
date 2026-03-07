@@ -119,7 +119,7 @@ const SiteSettingsManager = () => {
 
       <TabsContent value="seo">
         <Card>
-          <CardHeader><CardTitle>SEO настройки</CardTitle></CardHeader>
+          <CardHeader><CardTitle>SEO — Главная страница</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label>Заголовок сайта (Title)</Label>
@@ -134,6 +134,28 @@ const SiteSettingsManager = () => {
               <Input value={settings['site_keywords'] || ''} onChange={e => set('site_keywords', e.target.value)} placeholder="трансфер сочи, такси сочи абхазия..." />
             </div>
             <SaveButton keys={['site_title', 'site_description', 'site_keywords']} />
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4">
+          <CardHeader><CardTitle>SEO — Страница тарифов</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+              Эти настройки отображаются при открытии страницы /tariffs в браузере и поисковиках
+            </div>
+            <div>
+              <Label>Title страницы тарифов</Label>
+              <Input value={settings['tariffs_seo_title'] || ''} onChange={e => set('tariffs_seo_title', e.target.value)} placeholder="Тарифы на трансфер Сочи — Абхазия | ПоехалиПро" />
+            </div>
+            <div>
+              <Label>Description страницы тарифов</Label>
+              <Textarea value={settings['tariffs_seo_description'] || ''} onChange={e => set('tariffs_seo_description', e.target.value)} rows={3} placeholder="Актуальные цены на трансфер из Сочи в Абхазию. Эконом от 1500₽, Комфорт от 2000₽..." />
+            </div>
+            <div>
+              <Label>Keywords страницы тарифов</Label>
+              <Input value={settings['tariffs_seo_keywords'] || ''} onChange={e => set('tariffs_seo_keywords', e.target.value)} placeholder="тарифы трансфер сочи, цена такси абхазия..." />
+            </div>
+            <SaveButton keys={['tariffs_seo_title', 'tariffs_seo_description', 'tariffs_seo_keywords']} />
           </CardContent>
         </Card>
 

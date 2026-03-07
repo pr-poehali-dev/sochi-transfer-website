@@ -363,7 +363,7 @@ const DriverCabinet = () => {
     try {
       const r = await fetch(API_URLS.balance, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Driver-Id': driverId || '' },
         body: JSON.stringify({ action: 'withdraw', amount: parseFloat(withdrawAmount), requisites: withdrawRequisites, driver_id: driverId })
       });
       const data = await r.json();
