@@ -138,10 +138,27 @@ const SiteSettingsManager = () => {
         </Card>
 
         <Card className="mt-4">
+          <CardHeader><CardTitle>SEO — Общие настройки сайта</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>URL сайта (для canonical и OG-тегов)</Label>
+              <Input value={settings['site_url'] || ''} onChange={e => set('site_url', e.target.value)} placeholder="https://sochi-transfer.ru" />
+              <p className="text-xs text-muted-foreground mt-1">Укажите точный адрес без слэша в конце. Нужен для правильных ссылок в поисковиках.</p>
+            </div>
+            <div>
+              <Label>OG-изображение (главная)</Label>
+              <Input value={settings['site_og_image'] || ''} onChange={e => set('site_og_image', e.target.value)} placeholder="https://cdn.example.com/og-image.jpg" />
+              <p className="text-xs text-muted-foreground mt-1">Картинка 1200×630px — отображается при публикации ссылки в соцсетях.</p>
+            </div>
+            <SaveButton keys={['site_url', 'site_og_image']} />
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4">
           <CardHeader><CardTitle>SEO — Страница тарифов</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
-              Эти настройки отображаются при открытии страницы /tariffs в браузере и поисковиках
+              Эти настройки отображаются при открытии страницы /tariffs в браузере и поисковиках. Страница автоматически получает JSON-LD разметку со всеми тарифами для Google.
             </div>
             <div>
               <Label>Title страницы тарифов</Label>
@@ -155,7 +172,12 @@ const SiteSettingsManager = () => {
               <Label>Keywords страницы тарифов</Label>
               <Input value={settings['tariffs_seo_keywords'] || ''} onChange={e => set('tariffs_seo_keywords', e.target.value)} placeholder="тарифы трансфер сочи, цена такси абхазия..." />
             </div>
-            <SaveButton keys={['tariffs_seo_title', 'tariffs_seo_description', 'tariffs_seo_keywords']} />
+            <div>
+              <Label>OG-изображение страницы тарифов</Label>
+              <Input value={settings['tariffs_seo_og_image'] || ''} onChange={e => set('tariffs_seo_og_image', e.target.value)} placeholder="https://cdn.example.com/tariffs-og.jpg" />
+              <p className="text-xs text-muted-foreground mt-1">Если не указано — используется OG-изображение главной страницы.</p>
+            </div>
+            <SaveButton keys={['tariffs_seo_title', 'tariffs_seo_description', 'tariffs_seo_keywords', 'tariffs_seo_og_image']} />
           </CardContent>
         </Card>
 

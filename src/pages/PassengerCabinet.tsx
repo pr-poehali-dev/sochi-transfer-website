@@ -377,7 +377,14 @@ const PassengerCabinet = () => {
     notes: '',
     payment_type: 'online',
   });
-  const [paymentSettings, setPaymentSettings] = useState<{payment_provider?: string; allow_cash?: boolean}>({});
+  const [paymentSettings, setPaymentSettings] = useState<{
+    payment_provider?: string;
+    allow_cash?: boolean;
+    allow_prepay?: boolean;
+    prepay_percent?: number;
+    allow_full_payment?: boolean;
+  }>({});
+  const [showOrderForm, setShowOrderForm] = useState(false);
 
   // Wallet state
   const [userBalance, setUserBalance] = useState(0);
@@ -685,6 +692,7 @@ const PassengerCabinet = () => {
     }
 
     const isCash = orderForm.payment_type === 'cash';
+    const isPrepay = orderForm.payment_type === 'prepay';
     const hasOnlinePayment = paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none';
 
     setOrderLoading(true);
@@ -700,7 +708,7 @@ const PassengerCabinet = () => {
           passenger_name: userName,
           passenger_phone: userPhone,
           user_id: parseInt(userId),
-          payment_type: isCash ? 'cash' : 'full',
+          payment_type: isCash ? 'cash' : isPrepay ? 'prepay' : 'full',
           transfer_type: 'individual',
           force_payment: !isCash && !!hasOnlinePayment,
         }),
@@ -713,6 +721,7 @@ const PassengerCabinet = () => {
       } else {
         toast({ title: `Заказ #${data.id} создан!`, description: isCash ? 'Оплата — наличными при встрече' : 'Водитель свяжется с вами' });
         setOrderDialog(false);
+        setShowOrderForm(false);
         if (userId) loadTransferOrders(userId);
       }
     } catch (err: unknown) {
@@ -866,27 +875,347 @@ const PassengerCabinet = () => {
               <div className="flex justify-center py-16">
                 <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
               </div>
+            ) : showOrderForm ? (
+              /* ═══ INLINE ORDER FORM ═══ */
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowOrderForm(false)}
+                    className="w-9 h-9 rounded-xl border flex items-center justify-center hover:bg-muted transition-colors"
+                  >
+                    <Icon name="ArrowLeft" className="h-4 w-4" />
+                  </button>
+                  <div>
+                    <h2 className="font-bold text-base">Новый трансфер</h2>
+                    <p className="text-xs text-muted-foreground">Заполните детали поездки</p>
+                  </div>
+                </div>
+
+                {/* Form card */}
+                <div className="rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent overflow-hidden">
+                  {/* Hero */}
+                  <div className="gradient-primary p-4 flex items-center gap-3">
+                    <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                      <Icon name="Navigation" className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-base">Заказ трансфера</p>
+                      <p className="text-white/80 text-xs">Персональный автомобиль с водителем</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 space-y-4">
+                    {/* Direction */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Маршрут</label>
+                      {tariffs.length > 0 ? (
+                        <Select
+                          value={orderForm.tariff_id}
+                          onValueChange={v => {
+                            const t = tariffs.find(tt => tt.id === parseInt(v));
+                            setOrderForm(f => ({
+                              ...f,
+                              tariff_id: v,
+                              from_location: t ? 'Аэропорт Сочи' : f.from_location,
+                              to_location: t ? t.city : f.to_location,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className="h-12 bg-background">
+                            <SelectValue placeholder="Выберите направление" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tariffs.map(t => (
+                              <SelectItem key={t.id} value={String(t.id)}>
+                                <span className="flex items-center justify-between w-full gap-4">
+                                  <span>Аэропорт Сочи → {t.city}</span>
+                                  <span className="text-muted-foreground text-xs">от {Number(t.price).toLocaleString('ru-RU')} ₽</span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <Icon name="MapPin" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500 pointer-events-none" />
+                            <Input className="h-12 pl-9 bg-background" placeholder="Откуда" value={orderForm.from_location} onChange={e => setOrderForm(f => ({ ...f, from_location: e.target.value }))} />
+                          </div>
+                          <div className="relative">
+                            <Icon name="Navigation" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500 pointer-events-none" />
+                            <Input className="h-12 pl-9 bg-background" placeholder="Куда" value={orderForm.to_location} onChange={e => setOrderForm(f => ({ ...f, to_location: e.target.value }))} />
+                          </div>
+                        </div>
+                      )}
+                      {orderForm.tariff_id && (
+                        <div className="flex items-center gap-3 bg-background/80 rounded-xl p-2.5 border border-border/50">
+                          <div className="flex flex-col items-center gap-0.5 shrink-0">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <div className="w-px h-3 bg-muted-foreground/30" />
+                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold leading-none">{orderForm.from_location}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{orderForm.to_location}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Car class */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Класс автомобиля</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(carClasses.length > 0 ? carClasses : Object.entries(CAR_CLASS_LABELS).map(([v, l]) => ({ value: v, label: l, price_multiplier: 1 }))).map(cls => {
+                          const active = orderForm.car_class === cls.value;
+                          const clsPrice = orderForm.tariff_id ? (() => {
+                            const t = tariffs.find(tt => tt.id === parseInt(orderForm.tariff_id));
+                            return t ? Math.round(Number(t.price) * Number(cls.price_multiplier)) : 0;
+                          })() : 0;
+                          return (
+                            <button
+                              key={cls.value}
+                              type="button"
+                              onClick={() => setOrderForm(f => ({ ...f, car_class: cls.value }))}
+                              className={`text-left p-3 rounded-xl border-2 transition-all ${
+                                active
+                                  ? 'border-primary bg-primary/10'
+                                  : 'border-border bg-background hover:border-primary/40'
+                              }`}
+                            >
+                              <p className={`text-sm font-semibold ${active ? 'text-primary' : ''}`}>{cls.label}</p>
+                              {clsPrice > 0 ? (
+                                <p className={`text-xs mt-0.5 ${active ? 'text-primary/70' : 'text-muted-foreground'}`}>{clsPrice.toLocaleString('ru-RU')} ₽</p>
+                              ) : Number(cls.price_multiplier) !== 1 ? (
+                                <p className="text-[10px] text-muted-foreground">×{Number(cls.price_multiplier).toFixed(1)}</p>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Date & passengers */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Дата и время</label>
+                        <div className="relative">
+                          <Icon name="Calendar" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <Input
+                            className="h-12 pl-9 bg-background"
+                            type="datetime-local"
+                            min={nowDatetimeLocal()}
+                            value={orderForm.pickup_datetime}
+                            onChange={e => setOrderForm(f => ({ ...f, pickup_datetime: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Пассажиров</label>
+                        <Select value={orderForm.passengers_count} onValueChange={v => setOrderForm(f => ({ ...f, passengers_count: v }))}>
+                          <SelectTrigger className="h-12 bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1,2,3,4,5,6,7,8].map(n => (
+                              <SelectItem key={n} value={String(n)}>{n} {n === 1 ? 'пассажир' : n <= 4 ? 'пассажира' : 'пассажиров'}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Flight number */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Номер рейса <span className="normal-case font-normal">(необязательно)</span>
+                      </label>
+                      <div className="relative">
+                        <Icon name="Plane" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          className="h-12 pl-9 bg-background"
+                          placeholder="SU 1234"
+                          value={orderForm.flight_number}
+                          onChange={e => setOrderForm(f => ({ ...f, flight_number: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Комментарий <span className="normal-case font-normal">(необязательно)</span>
+                      </label>
+                      <Textarea
+                        className="bg-background resize-none"
+                        placeholder="Детское кресло, встреча с табличкой, особые пожелания..."
+                        rows={2}
+                        value={orderForm.notes}
+                        onChange={e => setOrderForm(f => ({ ...f, notes: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price & Payment */}
+                {computedPrice > 0 && (
+                  <div className="rounded-2xl border-2 border-primary/20 overflow-hidden">
+                    {/* Price summary */}
+                    <div className="p-4 bg-gradient-to-r from-primary/10 to-primary/5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Итоговая стоимость</p>
+                          <p className="text-3xl font-extrabold text-gradient">{computedPrice.toLocaleString('ru-RU')} ₽</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">за весь автомобиль</p>
+                        </div>
+                        <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center">
+                          <Icon name="Receipt" className="h-7 w-7 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Payment methods */}
+                    <div className="p-4 space-y-2 border-t border-primary/10">
+                      <p className="text-sm font-semibold">Способ оплаты</p>
+
+                      {/* Cash */}
+                      <button
+                        type="button"
+                        onClick={() => setOrderForm(f => ({ ...f, payment_type: 'cash' }))}
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                          orderForm.payment_type === 'cash'
+                            ? 'border-primary bg-primary/8'
+                            : 'border-border bg-background hover:border-primary/40'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${orderForm.payment_type === 'cash' ? 'gradient-primary' : 'bg-muted'}`}>
+                          <Icon name="Banknote" className={`h-5 w-5 ${orderForm.payment_type === 'cash' ? 'text-white' : 'text-muted-foreground'}`} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold">Наличными водителю</p>
+                          <p className="text-xs text-muted-foreground">Оплата при посадке</p>
+                        </div>
+                        <span className="font-bold text-sm">{computedPrice.toLocaleString('ru-RU')} ₽</span>
+                      </button>
+
+                      {/* Online full */}
+                      {paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none' && (paymentSettings.allow_full_payment ?? true) && (
+                        <button
+                          type="button"
+                          onClick={() => setOrderForm(f => ({ ...f, payment_type: 'online' }))}
+                          className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                            orderForm.payment_type === 'online'
+                              ? 'border-primary bg-primary/8'
+                              : 'border-border bg-background hover:border-primary/40'
+                          }`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${orderForm.payment_type === 'online' ? 'gradient-primary' : 'bg-muted'}`}>
+                            <Icon name="CreditCard" className={`h-5 w-5 ${orderForm.payment_type === 'online' ? 'text-white' : 'text-muted-foreground'}`} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold">
+                              Картой через {paymentSettings.payment_provider === 'yookassa' ? 'ЮКассу' : 'Робокассу'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Безопасная онлайн-оплата сейчас</p>
+                          </div>
+                          <span className="font-bold text-sm">{computedPrice.toLocaleString('ru-RU')} ₽</span>
+                        </button>
+                      )}
+
+                      {/* Prepay */}
+                      {paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none' && (paymentSettings.allow_prepay ?? false) && (
+                        <button
+                          type="button"
+                          onClick={() => setOrderForm(f => ({ ...f, payment_type: 'prepay' }))}
+                          className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                            orderForm.payment_type === 'prepay'
+                              ? 'border-primary bg-primary/8'
+                              : 'border-border bg-background hover:border-primary/40'
+                          }`}
+                        >
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${orderForm.payment_type === 'prepay' ? 'gradient-primary' : 'bg-muted'}`}>
+                            <Icon name="Percent" className={`h-5 w-5 ${orderForm.payment_type === 'prepay' ? 'text-white' : 'text-muted-foreground'}`} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold">Предоплата {paymentSettings.prepay_percent || 30}%</p>
+                            <p className="text-xs text-muted-foreground">
+                              {Math.round(computedPrice * (paymentSettings.prepay_percent || 30) / 100).toLocaleString('ru-RU')} ₽ сейчас, остаток при посадке
+                            </p>
+                          </div>
+                          <span className="font-bold text-sm">
+                            {Math.round(computedPrice * (paymentSettings.prepay_percent || 30) / 100).toLocaleString('ru-RU')} ₽
+                          </span>
+                        </button>
+                      )}
+
+                      {/* Info */}
+                      <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/40 rounded-xl p-3 mt-1">
+                        <Icon name="ShieldCheck" className="h-3.5 w-3.5 shrink-0 mt-0.5 text-green-500" />
+                        <span>
+                          {orderForm.payment_type === 'cash'
+                            ? 'Заказ будет создан, водитель свяжется с вами для подтверждения.'
+                            : 'После оплаты вам будет назначен водитель. Контакты появятся в этом разделе.'
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Submit */}
+                    <div className="p-4 border-t border-primary/10">
+                      <Button
+                        className="w-full gradient-primary text-white min-h-[52px] font-semibold text-base"
+                        onClick={handleCreateOrder}
+                        disabled={orderLoading || computedPrice <= 0 || !orderForm.pickup_datetime}
+                      >
+                        {orderLoading ? (
+                          <><Icon name="Loader2" className="h-5 w-5 animate-spin mr-2" />Создаём заказ...</>
+                        ) : orderForm.payment_type === 'cash' ? (
+                          <><Icon name="Car" className="h-5 w-5 mr-2" />Заказать трансфер · {computedPrice.toLocaleString('ru-RU')} ₽</>
+                        ) : (
+                          <><Icon name="CreditCard" className="h-5 w-5 mr-2" />Оплатить и заказать · {computedPrice.toLocaleString('ru-RU')} ₽</>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {computedPrice <= 0 && (
+                  <div className="text-center text-sm text-muted-foreground py-4">
+                    Выберите направление и класс автомобиля для расчёта стоимости
+                  </div>
+                )}
+              </div>
             ) : (
+              /* ═══ ORDERS LIST ═══ */
               <div className="space-y-4">
                 {/* Create order button */}
-                <Button
-                  className="w-full gradient-primary text-white min-h-[48px] font-semibold text-base"
-                  onClick={() => setOrderDialog(true)}
+                <button
+                  onClick={() => {
+                    setOrderForm({ from_location: '', to_location: '', pickup_datetime: '', flight_number: '', passengers_count: '1', tariff_id: '', car_class: 'comfort', notes: '', payment_type: paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none' ? 'online' : 'cash' });
+                    setShowOrderForm(true);
+                  }}
+                  className="w-full gradient-primary text-white min-h-[64px] rounded-2xl font-semibold text-base flex items-center justify-center gap-3 hover:opacity-95 transition-opacity shadow-lg"
                 >
-                  <Icon name="Plus" className="h-5 w-5 mr-2" />
-                  Заказать трансфер
-                </Button>
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <Icon name="Plus" className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold">Заказать трансфер</p>
+                    <p className="text-xs text-white/80 font-normal">Персональный автомобиль с водителем</p>
+                  </div>
+                </button>
 
                 {/* Orders list */}
                 {transferOrders.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-14 text-center space-y-3">
+                  <Card className="border-dashed">
+                    <CardContent className="py-12 text-center space-y-3">
                       <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto">
                         <Icon name="Navigation" className="h-7 w-7 text-muted-foreground" />
                       </div>
                       <div>
                         <p className="font-semibold text-muted-foreground">Заказов пока нет</p>
-                        <p className="text-sm text-muted-foreground mt-1">Закажите свой первый трансфер</p>
+                        <p className="text-sm text-muted-foreground mt-1">Нажмите кнопку выше, чтобы оформить первый трансфер</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -1662,8 +1991,8 @@ const PassengerCabinet = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ════ DIALOG: Create transfer order ════ */}
-      <Dialog open={orderDialog} onOpenChange={setOrderDialog}>
+      {/* ════ DIALOG: Create transfer order — kept for legacy, hidden ════ */}
+      <Dialog open={false} onOpenChange={setOrderDialog}>
         <DialogContent className="mx-3 rounded-2xl max-w-sm max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Заказать трансфер</DialogTitle>

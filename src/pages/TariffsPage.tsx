@@ -114,15 +114,79 @@ const TariffsPage = () => {
 
         // Apply SEO
         const pageTitle = s['tariffs_seo_title'] || s['site_title'] || 'Тарифы на трансфер';
+        const pageDesc = s['tariffs_seo_description'] || s['site_description'] || '';
+        const siteUrl = s['site_url'] || window.location.origin;
+        const ogImage = s['tariffs_seo_og_image'] || s['site_og_image'] || '';
+
         document.title = pageTitle;
-        const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', s['tariffs_seo_description'] || s['site_description'] || '');
-        const metaKw = document.querySelector('meta[name="keywords"]');
-        if (metaKw) metaKw.setAttribute('content', s['tariffs_seo_keywords'] || s['site_keywords'] || '');
-        const ogTitle = document.querySelector('meta[property="og:title"]');
-        if (ogTitle) ogTitle.setAttribute('content', pageTitle);
-        const ogDesc = document.querySelector('meta[property="og:description"]');
-        if (ogDesc) ogDesc.setAttribute('content', s['tariffs_seo_description'] || s['site_description'] || '');
+
+        const setMeta = (sel: string, attr: string, val: string) => {
+          const el = document.querySelector(sel);
+          if (el) el.setAttribute(attr, val);
+          else {
+            const m = document.createElement('meta');
+            const [a, v] = attr === 'content' ? ['content', val] : [attr, val];
+            const [na, nv] = sel.includes('property=') ? ['property', sel.match(/property="([^"]+)"/)![1]] : ['name', sel.match(/name="([^"]+)"/)![1]];
+            m.setAttribute(na, nv); m.setAttribute('content', val); document.head.appendChild(m);
+          }
+        };
+
+        setMeta('meta[name="description"]', 'content', pageDesc);
+        setMeta('meta[name="keywords"]', 'content', s['tariffs_seo_keywords'] || s['site_keywords'] || '');
+        setMeta('meta[property="og:title"]', 'content', pageTitle);
+        setMeta('meta[property="og:description"]', 'content', pageDesc);
+        setMeta('meta[property="og:type"]', 'content', 'website');
+        setMeta('meta[property="og:url"]', 'content', `${siteUrl}/tariffs`);
+        if (ogImage) setMeta('meta[property="og:image"]', 'content', ogImage);
+
+        // Canonical URL
+        let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+        if (!canonical) {
+          canonical = document.createElement('link');
+          canonical.setAttribute('rel', 'canonical');
+          document.head.appendChild(canonical);
+        }
+        canonical.setAttribute('href', `${siteUrl}/tariffs`);
+
+        // JSON-LD Structured Data
+        const existingLd = document.getElementById('tariffs-jsonld');
+        if (existingLd) existingLd.remove();
+        if (loadedTariffs.length > 0) {
+          const jsonLd = {
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            name: pageTitle,
+            description: pageDesc,
+            url: `${siteUrl}/tariffs`,
+            itemListElement: loadedTariffs.map((t, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              item: {
+                '@type': 'Service',
+                name: `Трансфер → ${t.city}`,
+                description: t.description || `Трансфер из аэропорта Сочи до ${t.city}`,
+                url: `${siteUrl}/tariffs`,
+                provider: {
+                  '@type': 'LocalBusiness',
+                  name: s['site_title'] || 'Трансфер Сочи',
+                  address: s['site_address'] || 'Сочи, Россия',
+                  telephone: s['company_phone'] || s['site_phone_display'] || '',
+                },
+                offers: {
+                  '@type': 'Offer',
+                  priceCurrency: 'RUB',
+                  price: t.price,
+                  availability: 'https://schema.org/InStock',
+                },
+              },
+            })),
+          };
+          const script = document.createElement('script');
+          script.id = 'tariffs-jsonld';
+          script.type = 'application/ld+json';
+          script.textContent = JSON.stringify(jsonLd);
+          document.head.appendChild(script);
+        }
 
         // Default calculator selection
         if (loadedTariffs.length > 0) setCalcTariffId(loadedTariffs[0].id);
@@ -133,7 +197,11 @@ const TariffsPage = () => {
       }
     };
     load();
-    return () => { document.title = 'ПоехалиПро'; };
+    return () => {
+      document.title = 'ПоехалиПро';
+      document.getElementById('tariffs-jsonld')?.remove();
+      document.querySelector('link[rel="canonical"]')?.remove();
+    };
   }, []);
 
   // Calculator derived values

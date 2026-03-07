@@ -136,6 +136,12 @@ const BookingForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
   const [successOrderId, setSuccessOrderId] = useState<number | null>(null);
+  const [paymentSettings, setPaymentSettings] = useState<{
+    payment_provider: string;
+    allow_prepay: boolean;
+    prepay_percent: number;
+    allow_full_payment: boolean;
+  }>({ payment_provider: 'none', allow_prepay: true, prepay_percent: 30, allow_full_payment: true });
 
   const [transferType, setTransferType] = useState('individual');
   const [carClass, setCarClass] = useState('comfort');
@@ -169,6 +175,7 @@ const BookingForm = () => {
     loadTransferConfig();
     checkAuth();
     loadServices();
+    loadPaymentSettings();
   }, []);
 
   const checkAuth = async () => {
@@ -219,6 +226,14 @@ const BookingForm = () => {
     } catch { /* silent */ }
   };
 
+  const loadPaymentSettings = async () => {
+    try {
+      const r = await fetch(API_URLS.paymentSettings);
+      const d = await r.json();
+      if (d.settings) setPaymentSettings(d.settings);
+    } catch { /* silent */ }
+  };
+
   const servicesTotal = selectedServices.reduce((sum, sid) => {
     const svc = services.find(s => s.id === sid);
     return sum + (svc ? Number(svc.price) : 0);
@@ -246,8 +261,11 @@ const BookingForm = () => {
   };
 
   const totalPrice = formData.price + servicesTotal;
-  const prepayAmount = Math.round(totalPrice * 0.3);
+  const prepayPct = paymentSettings.prepay_percent || 30;
+  const prepayAmount = Math.round(totalPrice * prepayPct / 100);
   const canPayByBalance = isLoggedIn && userBalance >= totalPrice && totalPrice > 0;
+  const hasOnlinePayment = paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none';
+  const providerLabel = paymentSettings.payment_provider === 'yookassa' ? 'ЮКасса' : paymentSettings.payment_provider === 'robokassa' ? 'Робокасса' : 'Онлайн';
 
   // ── Field handlers ────────────────────────────────────────────────────────
 
@@ -764,37 +782,91 @@ const BookingForm = () => {
                 {/* Payment options */}
                 <div className="border-t border-primary/15 bg-white/30 dark:bg-white/5 p-4 sm:p-5">
                   <p className="text-sm font-semibold mb-3">Способ оплаты</p>
-                  <div className={`grid gap-2 ${canPayByBalance ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-3'}`}>
-                    <PayOption
-                      active={formData.payment_type === 'cash' && !formData.payment_from_balance}
+                  <div className="space-y-2">
+                    {/* Cash — always available */}
+                    <button
+                      type="button"
                       onClick={() => setFormData(prev => ({ ...prev, payment_type: 'cash', payment_from_balance: false }))}
-                      label="Наличные"
-                      price={`${fmt(totalPrice)} ₽`}
-                      sub="при посадке"
-                    />
-                    <PayOption
-                      active={formData.payment_type === 'full' && !formData.payment_from_balance}
-                      onClick={() => setFormData(prev => ({ ...prev, payment_type: 'full', payment_from_balance: false }))}
-                      label="Онлайн"
-                      price={`${fmt(totalPrice)} ₽`}
-                      sub="картой сейчас"
-                    />
-                    <PayOption
-                      active={formData.payment_type === 'prepay' && !formData.payment_from_balance}
-                      onClick={() => setFormData(prev => ({ ...prev, payment_type: 'prepay', payment_from_balance: false }))}
-                      label="Предоплата 30%"
-                      price={`${fmt(prepayAmount)} ₽`}
-                      sub={`+${fmt(totalPrice - prepayAmount)} ₽ при посадке`}
-                    />
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                        formData.payment_type === 'cash' && !formData.payment_from_balance
+                          ? 'border-primary bg-primary/8'
+                          : 'border-border hover:border-primary/40'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${formData.payment_type === 'cash' && !formData.payment_from_balance ? 'gradient-primary' : 'bg-muted'}`}>
+                        <Icon name="Banknote" className={`h-4 w-4 ${formData.payment_type === 'cash' && !formData.payment_from_balance ? 'text-white' : 'text-muted-foreground'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold">Наличными водителю</p>
+                        <p className="text-xs text-muted-foreground">Оплата при посадке</p>
+                      </div>
+                      <span className="font-bold text-sm flex-shrink-0">{fmt(totalPrice)} ₽</span>
+                    </button>
+
+                    {/* Online via payment provider — only if configured */}
+                    {hasOnlinePayment && paymentSettings.allow_full_payment && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, payment_type: 'full', payment_from_balance: false }))}
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                          formData.payment_type === 'full' && !formData.payment_from_balance
+                            ? 'border-primary bg-primary/8'
+                            : 'border-border hover:border-primary/40'
+                        }`}
+                      >
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${formData.payment_type === 'full' && !formData.payment_from_balance ? 'gradient-primary' : 'bg-muted'}`}>
+                          <Icon name="CreditCard" className={`h-4 w-4 ${formData.payment_type === 'full' && !formData.payment_from_balance ? 'text-white' : 'text-muted-foreground'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">Онлайн через {providerLabel}</p>
+                          <p className="text-xs text-muted-foreground">Картой прямо сейчас — безопасно</p>
+                        </div>
+                        <span className="font-bold text-sm flex-shrink-0">{fmt(totalPrice)} ₽</span>
+                      </button>
+                    )}
+
+                    {/* Prepay — only if configured */}
+                    {hasOnlinePayment && paymentSettings.allow_prepay && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, payment_type: 'prepay', payment_from_balance: false }))}
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                          formData.payment_type === 'prepay' && !formData.payment_from_balance
+                            ? 'border-primary bg-primary/8'
+                            : 'border-border hover:border-primary/40'
+                        }`}
+                      >
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${formData.payment_type === 'prepay' && !formData.payment_from_balance ? 'gradient-primary' : 'bg-muted'}`}>
+                          <Icon name="Percent" className={`h-4 w-4 ${formData.payment_type === 'prepay' && !formData.payment_from_balance ? 'text-white' : 'text-muted-foreground'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">Предоплата {prepayPct}% через {providerLabel}</p>
+                          <p className="text-xs text-muted-foreground">+{fmt(totalPrice - prepayAmount)} ₽ остаток при посадке</p>
+                        </div>
+                        <span className="font-bold text-sm flex-shrink-0">{fmt(prepayAmount)} ₽</span>
+                      </button>
+                    )}
+
+                    {/* Balance */}
                     {canPayByBalance && (
-                      <PayOption
-                        active={formData.payment_from_balance}
+                      <button
+                        type="button"
                         onClick={() => setFormData(prev => ({ ...prev, payment_type: 'full', payment_from_balance: true }))}
-                        label="С баланса"
-                        price={`${fmt(totalPrice)} ₽`}
-                        sub={`Остаток: ${fmt(userBalance - totalPrice)} ₽`}
-                        green
-                      />
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                          formData.payment_from_balance
+                            ? 'border-green-500 bg-green-50 dark:bg-green-950/30'
+                            : 'border-border hover:border-green-400'
+                        }`}
+                      >
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${formData.payment_from_balance ? 'bg-green-500' : 'bg-muted'}`}>
+                          <Icon name="Wallet" className={`h-4 w-4 ${formData.payment_from_balance ? 'text-white' : 'text-muted-foreground'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${formData.payment_from_balance ? 'text-green-700 dark:text-green-400' : ''}`}>С баланса кошелька</p>
+                          <p className={`text-xs ${formData.payment_from_balance ? 'text-green-600 dark:text-green-500' : 'text-muted-foreground'}`}>Остаток после: {fmt(userBalance - totalPrice)} ₽</p>
+                        </div>
+                        <span className={`font-bold text-sm flex-shrink-0 ${formData.payment_from_balance ? 'text-green-700 dark:text-green-400' : ''}`}>{fmt(totalPrice)} ₽</span>
+                      </button>
                     )}
                   </div>
                 </div>
