@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,8 +14,9 @@ import { API_URLS } from '@/config/api';
 
 const Index = () => {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const [tariffs, setTariffs] = useState<Record<string, unknown>[]>([]);
   const [fleet, setFleet] = useState<Record<string, unknown>[]>([]);
@@ -30,18 +31,20 @@ const Index = () => {
   const isLoggedIn = !!localStorage.getItem('user_id');
   const isDriverLoggedIn = !!localStorage.getItem('driver_id');
 
+  useEffect(() => { loadAll(); }, []);
+
   useEffect(() => {
-    loadAll();
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close mobile menu on resize to desktop
   useEffect(() => {
     const onResize = () => { if (window.innerWidth >= 1024) setMobileMenuOpen(false); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -111,116 +114,114 @@ const Index = () => {
     finally { setReviewSending(false); }
   };
 
-  const scrollToSection = (sectionId: string) => {
-    setActiveSection(sectionId);
+  const scrollTo = (id: string) => {
     setMobileMenuOpen(false);
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
-  // ── Derived settings ──────────────────────────────────────────────────────
-  const whatsappUrl   = settings['whatsapp_number']   ? `https://wa.me/${settings['whatsapp_number']}` : 'https://wa.me/79000000000';
-  const telegramUrl   = settings['telegram_username'] ? `https://t.me/${settings['telegram_username']}` : '#';
+  const whatsappUrl = settings['whatsapp_number'] ? `https://wa.me/${settings['whatsapp_number']}` : 'https://wa.me/79000000000';
+  const telegramUrl = settings['telegram_username'] ? `https://t.me/${settings['telegram_username']}` : '#';
   const telegramGroupUrl = settings['telegram_group_url'] || settings['site_telegram_url'] || '';
-  const viberUrl      = settings['viber_number']      ? `viber://chat?number=${settings['viber_number']}` : '#';
-  const vkUrl         = settings['vk_url']            || '#';
-  const instagramUrl  = settings['instagram_url']     || '#';
-  const youtubeUrl    = settings['youtube_url']       || '#';
-  const tiktokUrl     = settings['tiktok_url']        || '#';
-  const maxUrl        = settings['max_username']
+  const viberUrl = settings['viber_number'] ? `viber://chat?number=${settings['viber_number']}` : '#';
+  const vkUrl = settings['vk_url'] || '#';
+  const instagramUrl = settings['instagram_url'] || '#';
+  const youtubeUrl = settings['youtube_url'] || '#';
+  const tiktokUrl = settings['tiktok_url'] || '#';
+  const maxUrl = settings['max_username']
     ? (settings['max_username'].startsWith('http') ? settings['max_username'] : `https://max.ru/${settings['max_username']}`)
     : '#';
-  const phone       = settings['company_phone']   || '+7 (900) 000-00-00';
-  const email       = settings['company_email']   || 'info@poehali.pro';
-  const address     = settings['company_address'] || 'г. Сочи, Аэропорт';
-  const heroBadge   = settings['hero_badge_text'] || 'Надежные трансферы с 2012 года';
-  const heroDesc    = settings['hero_description']|| 'Комфортные поездки из аэропорта, вокзала и любой точки города.';
-  const footerBrand  = settings['footer_brand']   || 'ПоехалиПро';
-  const footerSlogan = settings['footer_slogan']  || 'Трансфер Абхазия-Россия';
-  const siteYear    = settings['site_year']       || '2012';
+  const phone = settings['company_phone'] || '+7 (900) 000-00-00';
+  const email = settings['company_email'] || 'info@poehali.pro';
+  const address = settings['company_address'] || 'г. Сочи, Аэропорт';
+  const heroBadge = settings['hero_badge_text'] || 'Надежные трансферы с 2012 года';
+  const heroDesc = settings['hero_description'] || 'Комфортные поездки из аэропорта, вокзала и любой точки города.';
+  const footerBrand = settings['footer_brand'] || 'ПоехалиПро';
+  const footerSlogan = settings['footer_slogan'] || 'Трансфер Абхазия-Россия';
+  const siteYear = settings['site_year'] || '2012';
 
-  // Desktop nav sections (scroll-based)
-  const navSections = ['Главная', 'Автопарк', 'О нас', 'Отзывы', 'Контакты'];
+  const NAV_LINKS = [
+    { label: 'Главная', id: 'главная', icon: 'Home' },
+    { label: 'Тарифы', id: 'тарифы', icon: 'Tag' },
+    { label: 'Автопарк', id: 'автопарк', icon: 'Car' },
+    { label: 'Отзывы', id: 'отзывы', icon: 'Star' },
+    { label: 'Контакты', id: 'контакты', icon: 'Phone' },
+  ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       {settings['site_title'] && <title>{settings['site_title']}</title>}
 
-      {/* ════════════════════════════════════════════════
-          NAV
-      ════════════════════════════════════════════════ */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass-effect border-b border-white/20">
+      {/* ══════════════════════════════════════════════
+          NAVIGATION
+      ══════════════════════════════════════════════ */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled ? 'bg-white/95 dark:bg-background/95 backdrop-blur-xl shadow-sm border-b border-border' : 'bg-white/80 backdrop-blur-md border-b border-white/30'
+      }`}>
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16 md:h-20">
+          <div className="flex items-center justify-between h-16">
 
             {/* Logo */}
             <button
-              className="flex items-center gap-2 min-h-[44px]"
-              onClick={() => scrollToSection('главная')}
+              className="flex items-center gap-2.5 min-h-[44px] group"
+              onClick={() => scrollTo('главная')}
             >
-              <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0 shadow-md group-hover:scale-105 transition-transform">
                 <Icon name="Car" className="h-5 w-5 text-white" />
               </div>
               <div className="flex flex-col leading-tight text-left">
-                <span className="text-lg font-bold text-gradient">ПоехалиПро</span>
-                <span className="text-[10px] text-muted-foreground font-medium hidden sm:block">{footerSlogan}</span>
+                <span className="text-base font-bold text-gradient">{footerBrand}</span>
+                <span className="text-[10px] text-muted-foreground hidden sm:block">{footerSlogan}</span>
               </div>
             </button>
 
-            {/* Desktop nav links */}
-            <div className="hidden lg:flex items-center gap-5">
-              {navSections.map(item => (
+            {/* Desktop nav */}
+            <div className="hidden lg:flex items-center gap-1">
+              {NAV_LINKS.map(item => (
                 <button
-                  key={item}
-                  onClick={() => scrollToSection(item.toLowerCase())}
-                  className={`text-sm font-medium transition-all hover:text-primary ${activeSection === item.toLowerCase() ? 'text-primary' : 'text-foreground/70'}`}
+                  key={item.id}
+                  onClick={() => scrollTo(item.id)}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-foreground/70 hover:text-primary hover:bg-primary/5 transition-all"
                 >
-                  {item}
+                  {item.label}
                 </button>
               ))}
               <button
                 onClick={() => navigate('/tariffs')}
-                className="text-sm font-medium transition-all hover:text-primary text-foreground/70 flex items-center gap-1"
+                className="px-3 py-2 rounded-lg text-sm font-medium text-foreground/70 hover:text-primary hover:bg-primary/5 transition-all flex items-center gap-1"
               >
-                <Icon name="Tag" className="h-3.5 w-3.5" />
-                Тарифы
+                Все маршруты
               </button>
-              <button
-                onClick={() => navigate('/rideshares')}
-                className="text-sm font-medium transition-all hover:text-primary text-foreground/70 flex items-center gap-1"
-              >
-                <Icon name="Users" className="h-3.5 w-3.5" />
-                Попутчики
-              </button>
+              {settings['feature_rideshares'] !== 'false' && (
+                <button
+                  onClick={() => navigate('/rideshares')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-foreground/70 hover:text-primary hover:bg-primary/5 transition-all"
+                >
+                  Попутчики
+                </button>
+              )}
               <button
                 onClick={() => navigate('/news')}
-                className="text-sm font-medium transition-all hover:text-primary text-foreground/70 flex items-center gap-1"
+                className="px-3 py-2 rounded-lg text-sm font-medium text-foreground/70 hover:text-primary hover:bg-primary/5 transition-all"
               >
-                <Icon name="Newspaper" className="h-3.5 w-3.5" />
                 Новости
-              </button>
-              <button
-                onClick={() => navigate('/become-driver')}
-                className="text-sm font-medium transition-all hover:text-primary text-foreground/70 flex items-center gap-1"
-              >
-                <Icon name="Car" className="h-3.5 w-3.5" />
-                Водителям
               </button>
             </div>
 
-            {/* Desktop right: messenger icons + auth */}
+            {/* Desktop right */}
             <div className="hidden lg:flex items-center gap-2">
               {settings['whatsapp_number'] && (
                 <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                  <Button variant="ghost" size="icon" className="hover:scale-110 transition-transform" title="WhatsApp">
-                    <Icon name="MessageCircle" className="h-5 w-5 text-green-500" />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-green-500 hover:bg-green-50 hover:text-green-600">
+                    <Icon name="MessageCircle" className="h-5 w-5" />
                   </Button>
                 </a>
               )}
               {settings['telegram_username'] && (
                 <a href={telegramUrl} target="_blank" rel="noopener noreferrer">
-                  <Button variant="ghost" size="icon" className="hover:scale-110 transition-transform" title="Telegram">
-                    <Icon name="Send" className="h-5 w-5 text-blue-500" />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 text-blue-500 hover:bg-blue-50 hover:text-blue-600">
+                    <Icon name="Send" className="h-5 w-5" />
                   </Button>
                 </a>
               )}
@@ -233,42 +234,39 @@ const Index = () => {
                 </a>
               )}
               {isLoggedIn ? (
-                <Button size="sm" variant="outline" onClick={() => navigate('/profile')}>
-                  <Icon name="User" className="mr-1.5 h-4 w-4" />
+                <Button size="sm" variant="outline" onClick={() => navigate('/profile')} className="gap-1.5">
+                  <Icon name="User" className="h-4 w-4" />
                   Кабинет
                 </Button>
               ) : (
-                <Button size="sm" className="gradient-primary text-white" onClick={() => navigate('/auth')}>
+                <Button size="sm" className="gradient-primary text-white shadow-sm" onClick={() => navigate('/auth')}>
                   Войти
                 </Button>
               )}
             </div>
 
-            {/* Mobile right: phone + messenger + hamburger */}
-            <div className="flex lg:hidden items-center gap-1">
-              {/* Phone button always visible on mobile */}
+            {/* Mobile right */}
+            <div className="flex lg:hidden items-center gap-0.5">
               <a
                 href={`tel:${phone.replace(/\D/g, '')}`}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary"
+                className="h-11 w-11 flex items-center justify-center text-primary rounded-xl hover:bg-primary/10 transition-colors"
                 aria-label="Позвонить"
               >
                 <Icon name="Phone" className="h-5 w-5" />
               </a>
-              {/* WhatsApp always visible on mobile if configured */}
               {settings['whatsapp_number'] && (
                 <a
                   href={whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center text-green-500"
+                  className="h-11 w-11 flex items-center justify-center text-green-500 rounded-xl hover:bg-green-50 transition-colors"
                   aria-label="WhatsApp"
                 >
                   <Icon name="MessageCircle" className="h-5 w-5" />
                 </a>
               )}
-              {/* Hamburger */}
               <button
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center"
+                className="h-11 w-11 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
                 onClick={() => setMobileMenuOpen(v => !v)}
                 aria-label={mobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
                 aria-expanded={mobileMenuOpen}
@@ -279,200 +277,206 @@ const Index = () => {
           </div>
         </div>
 
-        {/* ── Mobile slide-down menu ── */}
+        {/* Mobile drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-background/98 backdrop-blur-md overflow-y-auto" style={{ top: '64px', WebkitOverflowScrolling: 'touch' }}>
-            <div className="px-4 py-4 space-y-1 max-w-lg mx-auto">
+          <>
+            <div
+              className="lg:hidden fixed inset-0 bg-black/40 z-40"
+              style={{ top: '64px' }}
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <div
+              ref={menuRef}
+              className="lg:hidden fixed left-0 right-0 bottom-0 z-50 bg-background rounded-t-2xl shadow-2xl overflow-y-auto"
+              style={{ top: '64px', WebkitOverflowScrolling: 'touch', maxHeight: 'calc(100dvh - 64px)' }}
+            >
+              <div className="px-4 pt-2 pb-6 max-w-lg mx-auto">
+                {/* Handle */}
+                <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4 mt-2" />
 
-              {/* Section scroll links */}
-              {navSections.map(item => (
-                <button
-                  key={item}
-                  onClick={() => scrollToSection(item.toLowerCase())}
-                  className="w-full text-left px-4 py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
-                >
-                  <Icon
-                    name={
-                      item === 'Главная' ? 'Home'
-                      : item === 'Тарифы' ? 'Tag'
-                      : item === 'Автопарк' ? 'Car'
-                      : item === 'О нас' ? 'Info'
-                      : item === 'Отзывы' ? 'Star'
-                      : 'Phone'
-                    }
-                    className="h-5 w-5 text-muted-foreground"
-                  />
-                  {item}
-                </button>
-              ))}
+                {/* Navigation sections */}
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 mb-2">Навигация</p>
+                <div className="space-y-0.5 mb-3">
+                  {NAV_LINKS.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => scrollTo(item.id)}
+                      className="w-full text-left px-4 py-3.5 rounded-xl text-base font-medium hover:bg-muted active:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Icon name={item.icon as Parameters<typeof Icon>[0]['name']} className="h-4 w-4 text-primary" />
+                      </div>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
 
-              {/* Divider */}
-              <div className="h-px bg-border my-2" />
-
-              {/* Page links */}
-              <button
-                onClick={() => { navigate('/tariffs'); setMobileMenuOpen(false); }}
-                className="w-full text-left px-4 py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
-              >
-                <Icon name="Tag" className="h-5 w-5 text-muted-foreground" />
-                Все тарифы
-              </button>
-              <button
-                onClick={() => { navigate('/rideshares'); setMobileMenuOpen(false); }}
-                className="w-full text-left px-4 py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
-              >
-                <Icon name="Users" className="h-5 w-5 text-muted-foreground" />
-                Попутчики
-              </button>
-              <button
-                onClick={() => { navigate('/news'); setMobileMenuOpen(false); }}
-                className="w-full text-left px-4 py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
-              >
-                <Icon name="Newspaper" className="h-5 w-5 text-muted-foreground" />
-                Новости
-              </button>
-              <button
-                onClick={() => { navigate('/become-driver'); setMobileMenuOpen(false); }}
-                className="w-full text-left px-4 py-3 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
-              >
-                <Icon name="Car" className="h-5 w-5 text-primary" />
-                <span>Стать водителем</span>
-                <Badge className="ml-auto text-xs gradient-primary text-white border-0">Доход</Badge>
-              </button>
-
-              {/* Divider */}
-              <div className="h-px bg-border my-2" />
-
-              {/* Telegram group — mobile */}
-              {telegramGroupUrl && settings['telegram_group_show'] !== 'false' && (
-                <a href={telegramGroupUrl} target="_blank" rel="noopener noreferrer">
-                  <button className="w-full text-left px-4 py-3 rounded-xl text-base font-medium hover:bg-blue-50 transition-colors flex items-center gap-3 min-h-[52px] text-blue-600 border border-blue-200">
-                    <Icon name="Send" className="h-5 w-5" />
-                    {settings['telegram_group_title'] || 'Telegram группа'}
+                <div className="h-px bg-border mb-3" />
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 mb-2">Страницы</p>
+                <div className="space-y-0.5 mb-3">
+                  <button
+                    onClick={() => { navigate('/tariffs'); setMobileMenuOpen(false); }}
+                    className="w-full text-left px-4 py-3.5 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                      <Icon name="MapPin" className="h-4 w-4 text-secondary" />
+                    </div>
+                    Все маршруты
                   </button>
-                </a>
-              )}
+                  {settings['feature_rideshares'] !== 'false' && (
+                    <button
+                      onClick={() => { navigate('/rideshares'); setMobileMenuOpen(false); }}
+                      className="w-full text-left px-4 py-3.5 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                        <Icon name="Users" className="h-4 w-4 text-secondary" />
+                      </div>
+                      Попутчики
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { navigate('/news'); setMobileMenuOpen(false); }}
+                    className="w-full text-left px-4 py-3.5 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                      <Icon name="Newspaper" className="h-4 w-4 text-secondary" />
+                    </div>
+                    Новости
+                  </button>
+                  {settings['feature_driver_register'] !== 'false' && (
+                    <button
+                      onClick={() => { navigate('/become-driver'); setMobileMenuOpen(false); }}
+                      className="w-full text-left px-4 py-3.5 rounded-xl text-base font-medium hover:bg-muted transition-colors flex items-center gap-3 min-h-[52px]"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <Icon name="Car" className="h-4 w-4 text-green-600" />
+                      </div>
+                      <span>Стать водителем</span>
+                      <Badge className="ml-auto text-xs gradient-primary text-white border-0">Доход</Badge>
+                    </button>
+                  )}
+                </div>
 
-              {/* Divider */}
-              <div className="h-px bg-border my-2" />
-
-              {/* Auth buttons */}
-              <div className="flex flex-col gap-2 pt-1">
-                {isLoggedIn ? (
+                {/* Messengers */}
+                {(settings['whatsapp_number'] || settings['telegram_username'] || settings['max_username']) && (
                   <>
-                    <Button
-                      className="w-full min-h-[52px] text-base"
-                      variant="outline"
-                      onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
-                    >
-                      <Icon name="User" className="mr-2 h-5 w-5" />
-                      Личный кабинет
-                    </Button>
-                    <Button
-                      className="w-full min-h-[48px]"
-                      variant="outline"
-                      onClick={() => { navigate('/passenger'); setMobileMenuOpen(false); }}
-                    >
-                      <Icon name="Users" className="mr-2 h-4 w-4" />
-                      Кабинет попутчика
-                    </Button>
+                    <div className="h-px bg-border mb-3" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 mb-2">Написать нам</p>
+                    <div className="flex gap-2 flex-wrap mb-3">
+                      {settings['whatsapp_number'] && (
+                        <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-[120px]">
+                          <Button variant="outline" className="w-full h-12 border-green-300 text-green-600 hover:bg-green-50 gap-2">
+                            <Icon name="MessageCircle" className="h-5 w-5" />WhatsApp
+                          </Button>
+                        </a>
+                      )}
+                      {settings['telegram_username'] && (
+                        <a href={telegramUrl} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-[120px]">
+                          <Button variant="outline" className="w-full h-12 border-blue-300 text-blue-600 hover:bg-blue-50 gap-2">
+                            <Icon name="Send" className="h-5 w-5" />Telegram
+                          </Button>
+                        </a>
+                      )}
+                      {settings['max_username'] && maxUrl !== '#' && (
+                        <a href={maxUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="icon" className="h-12 w-12">
+                            <Icon name="Share2" className="h-5 w-5 text-blue-600" />
+                          </Button>
+                        </a>
+                      )}
+                    </div>
                   </>
-                ) : (
-                  <Button
-                    className="w-full gradient-primary text-white min-h-[52px] text-base font-semibold"
-                    onClick={() => { navigate('/auth'); setMobileMenuOpen(false); }}
-                  >
-                    <Icon name="LogIn" className="mr-2 h-5 w-5" />
-                    Войти / Зарегистрироваться
-                  </Button>
                 )}
-                {isDriverLoggedIn ? (
-                  <Button
-                    className="w-full min-h-[52px] text-base"
-                    variant="outline"
-                    onClick={() => { navigate('/driver/cabinet'); setMobileMenuOpen(false); }}
-                  >
-                    <Icon name="Car" className="mr-2 h-5 w-5" />
-                    Кабинет водителя
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full min-h-[48px]"
-                    variant="outline"
-                    onClick={() => { navigate('/driver/register'); setMobileMenuOpen(false); }}
-                  >
-                    <Icon name="UserPlus" className="mr-2 h-4 w-4" />
-                    Стать водителем
-                  </Button>
-                )}
-              </div>
 
-              {/* Messenger buttons */}
-              <div className="pt-2 pb-4">
-                <p className="text-xs text-muted-foreground mb-3 px-1">Написать нам:</p>
-                <div className="flex gap-2 flex-wrap">
-                  {settings['whatsapp_number'] && (
-                    <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
-                      <Button variant="outline" className="w-full min-h-[48px] border-green-300 text-green-600 hover:bg-green-50">
-                        <Icon name="MessageCircle" className="mr-2 h-5 w-5" />WhatsApp
+                {/* Telegram group */}
+                {telegramGroupUrl && settings['telegram_group_show'] !== 'false' && (
+                  <a href={telegramGroupUrl} target="_blank" rel="noopener noreferrer" className="block mb-3">
+                    <Button variant="outline" className="w-full h-12 text-blue-600 border-blue-200 hover:bg-blue-50 gap-2">
+                      <Icon name="Send" className="h-4 w-4" />
+                      {settings['telegram_group_title'] || 'Telegram группа'}
+                    </Button>
+                  </a>
+                )}
+
+                <div className="h-px bg-border mb-3" />
+
+                {/* Auth */}
+                <div className="flex flex-col gap-2">
+                  {isLoggedIn ? (
+                    <>
+                      <Button className="w-full h-12 font-semibold" variant="outline" onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}>
+                        <Icon name="User" className="mr-2 h-5 w-5" />
+                        Личный кабинет
                       </Button>
-                    </a>
+                      <Button className="w-full h-12" variant="outline" onClick={() => { navigate('/passenger'); setMobileMenuOpen(false); }}>
+                        <Icon name="Users" className="mr-2 h-4 w-4" />
+                        Кабинет попутчика
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button className="w-full h-12 gradient-primary text-white font-semibold shadow-md" onClick={() => { navigate('/auth'); setMobileMenuOpen(false); }}>
+                        <Icon name="LogIn" className="mr-2 h-5 w-5" />
+                        Войти в личный кабинет
+                      </Button>
+                      <Button className="w-full h-12" variant="outline" onClick={() => { navigate('/passenger'); setMobileMenuOpen(false); }}>
+                        <Icon name="Users" className="mr-2 h-4 w-4" />
+                        Кабинет пассажира
+                      </Button>
+                    </>
                   )}
-                  {settings['telegram_username'] && (
-                    <a href={telegramUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
-                      <Button variant="outline" className="w-full min-h-[48px] border-blue-300 text-blue-600 hover:bg-blue-50">
-                        <Icon name="Send" className="mr-2 h-5 w-5" />Telegram
-                      </Button>
-                    </a>
-                  )}
-                  {settings['max_username'] && maxUrl !== '#' && (
-                    <a href={maxUrl} target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="icon" className="min-h-[48px] min-w-[48px]">
-                        <Icon name="Share2" className="h-5 w-5 text-blue-600" />
-                      </Button>
-                    </a>
+                  {!isDriverLoggedIn && settings['feature_driver_register'] !== 'false' && (
+                    <Button className="w-full h-12" variant="outline" onClick={() => { navigate('/driver/register'); setMobileMenuOpen(false); }}>
+                      <Icon name="UserPlus" className="mr-2 h-4 w-4" />
+                      Стать водителем
+                    </Button>
                   )}
                 </div>
               </div>
             </div>
-          </div>
+          </>
         )}
       </nav>
 
-      {/* ════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════
           HERO
-      ════════════════════════════════════════════════ */}
-      <section id="главная" className="relative pt-20 md:pt-32 pb-16 md:pb-20 overflow-hidden">
-        <div className="absolute inset-0 gradient-primary opacity-10" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-10 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl pointer-events-none" />
+      ══════════════════════════════════════════════ */}
+      <section id="главная" className="relative pt-20 overflow-hidden">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-background to-secondary/8 pointer-events-none" />
+        <div className="absolute -top-20 -right-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-72 h-72 bg-secondary/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center animate-fade-in">
+        <div className="container mx-auto px-4 relative z-10 pt-8 pb-14 md:pt-14 md:pb-20">
+          <div className="max-w-4xl mx-auto text-center">
             {/* Badge */}
-            <Badge className="mb-4 md:mb-6 px-4 md:px-6 py-1.5 md:py-2 text-xs md:text-sm gradient-primary text-white border-0">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5 md:mb-7 border border-primary/20">
+              <Icon name="Shield" className="h-4 w-4" />
               {heroBadge}
-            </Badge>
+            </div>
 
-            {/* Headline — compact on mobile */}
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold mb-4 md:mb-6 leading-tight">
-              Трансфер в <span className="text-gradient">Сочи</span> и <span className="text-gradient">Абхазию</span>
+            {/* Headline */}
+            <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 md:mb-6 leading-tight tracking-tight">
+              Трансфер в{' '}
+              <span className="text-gradient">Сочи</span>
+              {' '}и{' '}
+              <span className="text-gradient">Абхазию</span>
             </h1>
-            <p className="text-base md:text-xl text-muted-foreground mb-6 md:mb-10 max-w-2xl mx-auto px-2">
+            <p className="text-base md:text-xl text-muted-foreground mb-6 md:mb-10 max-w-2xl mx-auto leading-relaxed">
               {heroDesc}
             </p>
 
-            {/* Mobile CTA strip above form */}
-            <div className="flex sm:hidden items-center justify-center gap-3 mb-5">
+            {/* Mobile CTA */}
+            <div className="flex sm:hidden gap-2 mb-5">
               <a href={`tel:${phone.replace(/\D/g, '')}`} className="flex-1">
-                <Button size="lg" className="w-full min-h-[52px] gradient-primary text-white text-base font-semibold">
+                <Button size="lg" className="w-full h-14 gradient-primary text-white font-bold text-base shadow-lg">
                   <Icon name="Phone" className="mr-2 h-5 w-5" />
                   Позвонить
                 </Button>
               </a>
               {settings['whatsapp_number'] && (
                 <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
-                  <Button size="lg" variant="outline" className="w-full min-h-[52px] border-green-400 text-green-600 text-base">
+                  <Button size="lg" variant="outline" className="w-full h-14 border-green-400 text-green-600 font-semibold">
                     <Icon name="MessageCircle" className="mr-2 h-5 w-5" />
                     WhatsApp
                   </Button>
@@ -480,24 +484,26 @@ const Index = () => {
               )}
             </div>
 
-            {/* Booking form - full width on mobile */}
-            <div id="booking">
+            {/* Booking form */}
+            <div id="booking" className="text-left">
               <BookingForm />
             </div>
 
             {/* Trust chips */}
-            <div className="grid grid-cols-3 gap-3 md:gap-6 mt-10 md:mt-12 max-w-2xl mx-auto">
+            <div className="grid grid-cols-3 gap-3 md:gap-8 mt-10 md:mt-14 max-w-lg mx-auto">
               {[
                 { icon: 'Shield', title: 'Безопасность', desc: 'Опытные водители' },
-                { icon: 'Clock',  title: 'Пунктуальность', desc: 'Встречаем вовремя' },
-                { icon: 'Star',   title: 'Качество', desc: 'Комфортные авто' },
+                { icon: 'Clock', title: 'Пунктуальность', desc: 'Встречаем вовремя' },
+                { icon: 'Star', title: 'Качество', desc: 'Комфортные авто' },
               ].map((item, idx) => (
-                <div key={idx} className="flex flex-col items-center gap-1.5 md:gap-3">
-                  <div className="w-10 h-10 md:w-16 md:h-16 rounded-full gradient-secondary flex items-center justify-center">
-                    <Icon name={item.icon as Parameters<typeof Icon>[0]['name']} className="h-5 w-5 md:h-8 md:w-8 text-white" />
+                <div key={idx} className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl gradient-secondary flex items-center justify-center shadow-md">
+                    <Icon name={item.icon as Parameters<typeof Icon>[0]['name']} className="h-5 w-5 md:h-6 md:w-6 text-white" />
                   </div>
-                  <h3 className="font-semibold text-xs md:text-lg">{item.title}</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground text-center hidden sm:block">{item.desc}</p>
+                  <div className="text-center">
+                    <p className="font-bold text-xs md:text-sm">{item.title}</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground hidden sm:block">{item.desc}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -505,35 +511,28 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════
-          BECOME DRIVER BANNER STRIP
-      ════════════════════════════════════════════════ */}
-      {!isDriverLoggedIn && (
+      {/* ══════════════════════════════════════════════
+          BECOME DRIVER BANNER
+      ══════════════════════════════════════════════ */}
+      {!isDriverLoggedIn && settings['feature_driver_register'] !== 'false' && (
         <section className="py-4 md:py-6 bg-gradient-to-r from-primary/8 to-secondary/8 border-y border-primary/10">
           <div className="container mx-auto px-4">
-            <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 p-4 md:p-5 rounded-2xl border border-primary/20 bg-background/60 backdrop-blur-sm">
+            <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 p-4 md:p-5 rounded-2xl border border-primary/20 bg-white/60 dark:bg-background/60 backdrop-blur-sm">
               <div className="flex items-center gap-3 md:gap-4">
-                <div className="w-11 h-11 md:w-12 md:h-12 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
-                  <Icon name="Car" className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                <div className="w-11 h-11 rounded-full gradient-primary flex items-center justify-center flex-shrink-0 shadow-md">
+                  <Icon name="Car" className="h-5 w-5 text-white" />
                 </div>
                 <div className="text-center sm:text-left">
-                  <p className="font-semibold text-sm md:text-base leading-tight">Стать водителем ПоехалиПро</p>
+                  <p className="font-bold text-sm md:text-base leading-tight">Стать водителем ПоехалиПро</p>
                   <p className="text-xs md:text-sm text-muted-foreground mt-0.5">Зарабатывайте от 60 000 ₽/мес на своём автомобиле</p>
                 </div>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button
-                  className="gradient-primary text-white flex-1 sm:flex-none min-h-[44px] font-semibold"
-                  onClick={() => navigate('/become-driver')}
-                >
+                <Button className="gradient-primary text-white flex-1 sm:flex-none h-11 font-semibold shadow-md" onClick={() => navigate('/become-driver')}>
                   Узнать подробнее
                   <Icon name="ArrowRight" className="ml-2 h-4 w-4" />
                 </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 sm:flex-none min-h-[44px]"
-                  onClick={() => navigate('/driver/register')}
-                >
+                <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => navigate('/driver/register')}>
                   Подать заявку
                 </Button>
               </div>
@@ -542,238 +541,237 @@ const Index = () => {
         </section>
       )}
 
-      {/* ════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════
           TARIFFS
-      ════════════════════════════════════════════════ */}
-      <section id="тарифы" className="py-14 md:py-20 bg-gradient-to-b from-background to-muted/30">
+      ══════════════════════════════════════════════ */}
+      <section id="тарифы" className="py-14 md:py-20">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-10 md:mb-12">
-            <Badge className="mb-3 md:mb-4 gradient-secondary text-white border-0">Тарифы</Badge>
-            <h2 className="text-2xl md:text-5xl font-bold mb-3 md:mb-4">Направления и цены</h2>
-            <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto">
+          <div className="text-center mb-10 md:mb-14">
+            <div className="inline-flex items-center gap-2 bg-secondary/10 text-secondary-foreground rounded-full px-4 py-1.5 text-sm font-medium mb-4 border border-secondary/20">
+              <Icon name="Tag" className="h-4 w-4" />
+              Направления
+            </div>
+            <h2 className="text-2xl md:text-4xl font-extrabold mb-3">Направления и цены</h2>
+            <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
               Фиксированные цены без скрытых доплат. Цена не меняется в зависимости от трафика.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-7xl mx-auto">
-            {tariffs.map((tariff, idx) => (
-              <Card
-                key={String(tariff.id)}
-                className="hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border-2 hover:border-primary/50 animate-fade-in"
-                style={{ animationDelay: `${idx * 0.08}s` }}
-              >
-                <CardHeader className="text-center pb-3 md:pb-4">
-                  {tariff.image_url ? (
-                    <img src={String(tariff.image_url)} alt={String(tariff.city)} className="w-full h-28 md:h-32 object-cover rounded-lg mb-3" />
-                  ) : (
-                    <div className="text-4xl md:text-6xl mb-3">{String(tariff.image_emoji || '🚗')}</div>
+          {tariffs.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
+              {tariffs.slice(0, 8).map((tariff, idx) => (
+                <div
+                  key={String(tariff.id)}
+                  className="group relative bg-white dark:bg-card border-2 border-border hover:border-primary/40 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer animate-fade-in"
+                  style={{ animationDelay: `${idx * 0.06}s` }}
+                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                >
+                  {/* City emoji / image */}
+                  <div className="text-center mb-4">
+                    {tariff.image_url ? (
+                      <img src={String(tariff.image_url)} alt={String(tariff.city)} className="w-full h-24 object-cover rounded-xl mb-3" />
+                    ) : (
+                      <div className="text-5xl mb-2">{String(tariff.image_emoji || '🚗')}</div>
+                    )}
+                    <h3 className="font-bold text-lg leading-tight">{String(tariff.city)}</h3>
+                    <p className="text-xs text-muted-foreground">из Аэропорта Сочи</p>
+                  </div>
+
+                  {/* Price */}
+                  <div className="text-center mb-4">
+                    <div className="text-3xl font-extrabold text-gradient">{Number(tariff.price).toLocaleString('ru-RU')} ₽</div>
+                    <p className="text-xs text-muted-foreground">за автомобиль</p>
+                  </div>
+
+                  {/* Meta */}
+                  {(tariff.distance || tariff.duration) && (
+                    <div className="flex justify-center gap-3 text-xs text-muted-foreground mb-4">
+                      {tariff.distance && (
+                        <span className="flex items-center gap-1">
+                          <Icon name="MapPin" className="h-3 w-3 text-primary" />
+                          {String(tariff.distance)}
+                        </span>
+                      )}
+                      {tariff.duration && (
+                        <span className="flex items-center gap-1">
+                          <Icon name="Clock" className="h-3 w-3 text-primary" />
+                          ~{String(tariff.duration)}
+                        </span>
+                      )}
+                    </div>
                   )}
-                  <CardTitle className="text-lg md:text-2xl">{String(tariff.city)}</CardTitle>
-                  <CardDescription className="text-xs md:text-sm">из Аэропорта Сочи</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 md:space-y-4">
-                  <div className="text-center">
-                    <div className="text-2xl md:text-4xl font-bold text-gradient mb-1">{String(tariff.price)} ₽</div>
-                    <p className="text-xs md:text-sm text-muted-foreground">за автомобиль</p>
-                  </div>
-                  <div className="space-y-1.5 pt-3 border-t">
-                    {tariff.distance && (
-                      <div className="flex items-center gap-2 text-xs md:text-sm">
-                        <Icon name="MapPin" className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                        <span>{String(tariff.distance)}</span>
-                      </div>
-                    )}
-                    {tariff.duration && (
-                      <div className="flex items-center gap-2 text-xs md:text-sm">
-                        <Icon name="Clock" className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                        <span>~{String(tariff.duration)}</span>
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    className="w-full gradient-primary text-white min-h-[44px]"
-                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                  >
+
+                  <Button className="w-full gradient-primary text-white font-semibold h-11 group-hover:shadow-md transition-shadow">
                     Заказать
                   </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Icon name="Tag" className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p>Тарифы загружаются...</p>
+            </div>
+          )}
 
-          {/* View all tariffs link */}
           <div className="text-center mt-8">
-            <Button variant="outline" size="lg" onClick={() => navigate('/tariffs')}>
-              <Icon name="Tag" className="mr-2 h-4 w-4" />
-              Посмотреть все тарифы
+            <Button variant="outline" size="lg" className="gap-2 h-12 px-6" onClick={() => navigate('/tariffs')}>
+              <Icon name="Tag" className="h-4 w-4" />
+              Все маршруты и калькулятор цен
+              <Icon name="ArrowRight" className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════
-          FLEET — 2-col grid on mobile
-      ════════════════════════════════════════════════ */}
-      <section id="автопарк" className="py-14 md:py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-10 md:mb-12">
-            <Badge className="mb-3 md:mb-4 gradient-primary text-white border-0">Автопарк</Badge>
-            <h2 className="text-2xl md:text-5xl font-bold mb-3 md:mb-4">Наш автопарк</h2>
-            <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto">
-              Современные автомобили для вашего комфорта
-            </p>
-          </div>
-
-          {/* 2-column on mobile, 3-column on md+ */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 max-w-6xl mx-auto">
-            {fleet.map((car, idx) => (
-              <Card
-                key={String(car.id)}
-                className="hover:shadow-xl transition-all duration-300 hover:-translate-y-1 animate-fade-in"
-                style={{ animationDelay: `${idx * 0.08}s` }}
-              >
-                <CardHeader className="text-center p-3 md:p-6">
-                  {car.image_url ? (
-                    <img
-                      src={String(car.image_url)}
-                      alt={String(car.name)}
-                      className="w-full h-28 md:h-40 object-cover rounded-lg mb-2 md:mb-3"
-                    />
-                  ) : (
-                    <div className="text-4xl md:text-7xl mb-2 md:mb-4">{String(car.image_emoji || '🚗')}</div>
-                  )}
-                  <CardTitle className="text-sm md:text-xl mb-1 md:mb-2 leading-tight">{String(car.name)}</CardTitle>
-                  <Badge className="gradient-secondary text-white border-0 text-[10px] md:text-xs">{String(car.type)}</Badge>
-                </CardHeader>
-                <CardContent className="p-3 md:p-6 pt-0 md:pt-0 space-y-2 md:space-y-4">
-                  <div className="grid grid-cols-2 gap-1.5 md:gap-3 text-xs md:text-sm">
-                    <div className="flex items-center gap-1 md:gap-2">
-                      <Icon name="Users" className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary flex-shrink-0" />
-                      <span>{String(car.capacity)} пасс.</span>
-                    </div>
-                    <div className="flex items-center gap-1 md:gap-2">
-                      <Icon name="Luggage" className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary flex-shrink-0" />
-                      <span>{String(car.luggage_capacity)} мест</span>
-                    </div>
-                  </div>
-                  {/* Features — hidden on mobile to save space */}
-                  <div className="hidden md:block pt-3 border-t space-y-2">
-                    {(car.features as string[]).slice(0, 3).map((feature: string, fIdx: number) => (
-                      <div key={fIdx} className="flex items-center gap-2 text-sm">
-                        <Icon name="CheckCircle2" className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="w-full min-h-[40px] md:min-h-[44px] text-xs md:text-sm"
-                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                  >
-                    Выбрать авто
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════════════════════════════════════════
-          RIDESHARES PROMO
-      ════════════════════════════════════════════════ */}
-      {settings['feature_rideshares'] !== 'false' && (
-        <section id="попутчики" className="py-10 md:py-16">
+      {/* ══════════════════════════════════════════════
+          FLEET
+      ══════════════════════════════════════════════ */}
+      {fleet.length > 0 && (
+        <section id="автопарк" className="py-14 md:py-20 bg-gradient-to-b from-background to-muted/40">
           <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
-              <Card className="bg-gradient-to-br from-primary/10 via-background to-accent/10 border-2 border-primary/20 overflow-hidden">
-                <CardContent className="p-5 md:p-12">
-                  <div className="flex flex-col md:flex-row items-center gap-5 md:gap-8">
-                    <div className="flex-1 text-center md:text-left">
-                      <Badge className="mb-3 md:mb-4 gradient-primary text-white border-0">Сервис</Badge>
-                      <h2 className="text-xl md:text-4xl font-bold mb-3 md:mb-4">Едем вместе — дешевле!</h2>
-                      <p className="text-sm md:text-lg text-muted-foreground mb-4 md:mb-6">
-                        Раздели стоимость трансфера с другими пассажирами. Находи попутчиков из аэропорта Сочи в Абхазию.
-                      </p>
-                      <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
-                        <Button className="gradient-primary text-white min-h-[48px]" onClick={() => navigate('/rideshares')}>
-                          <Icon name="Users" className="mr-2 h-4 w-4" />
-                          Найти попутчиков
-                        </Button>
-                        <Button variant="outline" className="min-h-[48px]" onClick={() => navigate('/rideshares')}>
-                          <Icon name="Plus" className="mr-2 h-4 w-4" />
-                          Предложить поездку
-                        </Button>
-                      </div>
+            <div className="text-center mb-10 md:mb-14">
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-4 border border-primary/20">
+                <Icon name="Car" className="h-4 w-4" />
+                Автопарк
+              </div>
+              <h2 className="text-2xl md:text-4xl font-extrabold mb-3">Наш автопарк</h2>
+              <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto">
+                Современные автомобили для вашего комфорта
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5 max-w-5xl mx-auto">
+              {fleet.slice(0, 6).map((car, idx) => (
+                <div
+                  key={String(car.id)}
+                  className="bg-white dark:bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 animate-fade-in"
+                  style={{ animationDelay: `${idx * 0.07}s` }}
+                >
+                  {car.image_url ? (
+                    <img src={String(car.image_url)} alt={String(car.name)} className="w-full h-28 md:h-36 object-cover" />
+                  ) : (
+                    <div className="w-full h-28 md:h-36 bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center text-4xl md:text-6xl">
+                      {String(car.image_emoji || '🚗')}
                     </div>
-                    <div className="text-5xl md:text-8xl">🚕</div>
+                  )}
+                  <div className="p-3 md:p-4">
+                    <h3 className="font-bold text-sm md:text-base leading-tight mb-1">{String(car.name)}</h3>
+                    <Badge className="gradient-secondary text-white border-0 text-[10px] md:text-xs mb-2">{String(car.type)}</Badge>
+                    <div className="flex gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Icon name="Users" className="h-3 w-3 text-primary" />
+                        {String(car.capacity)} пасс.
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Icon name="Luggage" className="h-3 w-3 text-primary" />
+                        {String(car.luggage_capacity)} мест
+                      </span>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════
+          RIDESHARES PROMO
+      ══════════════════════════════════════════════ */}
+      {settings['feature_rideshares'] !== 'false' && (
+        <section id="попутчики" className="py-10 md:py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto bg-gradient-to-br from-primary/10 via-background to-accent/10 border-2 border-primary/20 rounded-2xl overflow-hidden">
+              <div className="p-6 md:p-10">
+                <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                  <div className="flex-1 text-center md:text-left">
+                    <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-medium mb-4 border border-primary/20">
+                      <Icon name="Users" className="h-4 w-4" />
+                      Сервис
+                    </div>
+                    <h2 className="text-xl md:text-3xl font-extrabold mb-3">Едем вместе — дешевле!</h2>
+                    <p className="text-sm md:text-base text-muted-foreground mb-5 leading-relaxed">
+                      Раздели стоимость трансфера с другими пассажирами. Находи попутчиков из аэропорта Сочи в Абхазию.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Button className="gradient-primary text-white h-12 font-semibold gap-2 shadow-md" onClick={() => navigate('/rideshares')}>
+                        <Icon name="Users" className="h-4 w-4" />
+                        Найти попутчиков
+                      </Button>
+                      <Button variant="outline" className="h-12 gap-2" onClick={() => navigate('/rideshares')}>
+                        <Icon name="Plus" className="h-4 w-4" />
+                        Предложить поездку
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-6xl md:text-8xl flex-shrink-0">🚕</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════════
           ABOUT
-      ════════════════════════════════════════════════ */}
+      ══════════════════════════════════════════════ */}
       <section id="о нас" className="py-14 md:py-20 bg-gradient-to-b from-background to-muted/30">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-10 md:mb-12">
-              <Badge className="mb-3 md:mb-4 gradient-secondary text-white border-0">О нас</Badge>
-              <h2 className="text-2xl md:text-5xl font-bold mb-4 md:mb-6">Почему выбирают нас</h2>
+              <div className="inline-flex items-center gap-2 bg-secondary/10 text-secondary-foreground rounded-full px-4 py-1.5 text-sm font-medium mb-4 border border-secondary/20">
+                <Icon name="Award" className="h-4 w-4" />
+                О компании
+              </div>
+              <h2 className="text-2xl md:text-4xl font-extrabold mb-3">Почему выбирают нас</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { icon: 'Award',      title: `Работаем с ${siteYear} года`, desc: 'Более 50 000 довольных клиентов и тысячи положительных отзывов' },
-                { icon: 'Shield',     title: 'Гарантия безопасности',       desc: 'Все водители с многолетним опытом, автомобили застрахованы' },
-                { icon: 'Clock',      title: 'Работаем 24/7',               desc: 'Круглосуточная служба поддержки и диспетчерская' },
-                { icon: 'DollarSign', title: 'Честные цены',                desc: 'Фиксированная стоимость, без скрытых доплат и комиссий' },
+                { icon: 'Award', title: `Работаем с ${siteYear} года`, desc: 'Более 50 000 довольных клиентов и тысячи положительных отзывов' },
+                { icon: 'Shield', title: 'Гарантия безопасности', desc: 'Все водители с многолетним опытом, автомобили застрахованы' },
+                { icon: 'Clock', title: 'Работаем 24/7', desc: 'Круглосуточная служба поддержки и диспетчерская' },
+                { icon: 'DollarSign', title: 'Честные цены', desc: 'Фиксированная стоимость, без скрытых доплат и комиссий' },
               ].map((item, idx) => (
-                <Card key={idx} className="glass-effect border-white/40 hover:shadow-xl transition-all">
-                  <CardContent className="p-4 md:p-6 flex gap-3 md:gap-4">
-                    <div className="w-11 h-11 md:w-14 md:h-14 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
-                      <Icon name={item.icon as Parameters<typeof Icon>[0]['name']} className="h-5 w-5 md:h-7 md:w-7 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm md:text-lg mb-1 md:mb-2">{item.title}</h3>
-                      <p className="text-xs md:text-sm text-muted-foreground">{item.desc}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div key={idx} className="flex gap-4 p-5 bg-white dark:bg-card border border-border rounded-2xl hover:shadow-lg transition-all">
+                  <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0 shadow-md">
+                    <Icon name={item.icon as Parameters<typeof Icon>[0]['name']} className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm md:text-base mb-1">{item.title}</h3>
+                    <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════
           NEWS
-      ════════════════════════════════════════════════ */}
+      ══════════════════════════════════════════════ */}
       {news.length > 0 && (
         <section className="py-10 md:py-16 bg-muted/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-8 md:mb-10">
-              <Badge className="mb-3 md:mb-4 gradient-secondary text-white border-0">Новости</Badge>
-              <h2 className="text-2xl md:text-3xl font-bold">Последние новости</h2>
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-4 border border-primary/20">
+                <Icon name="Newspaper" className="h-4 w-4" />
+                Новости
+              </div>
+              <h2 className="text-2xl md:text-3xl font-extrabold">Последние новости</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
               {news.slice(0, 3).map(n => (
-                <Card
+                <div
                   key={String(n.id)}
-                  className="hover:shadow-lg transition-all cursor-pointer group"
+                  className="bg-white dark:bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg transition-all cursor-pointer group hover:-translate-y-0.5"
                   onClick={() => navigate('/news')}
                 >
                   {n.image_url && (
-                    <img
-                      src={String(n.image_url)}
-                      alt={String(n.title)}
-                      className="w-full h-36 md:h-40 object-cover rounded-t-lg"
-                    />
+                    <img src={String(n.image_url)} alt={String(n.title)} className="w-full h-36 object-cover" />
                   )}
-                  <CardContent className="p-4">
+                  <div className="p-4">
                     <p className="font-semibold mb-2 line-clamp-2 text-sm md:text-base group-hover:text-primary transition-colors">
                       {String(n.title)}
                     </p>
@@ -784,13 +782,13 @@ const Index = () => {
                         {new Date(String(n.published_at)).toLocaleDateString('ru', { day: 'numeric', month: 'long' })}
                       </p>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
             <div className="text-center mt-6">
-              <Button variant="outline" onClick={() => navigate('/news')}>
-                <Icon name="Newspaper" className="mr-2 h-4 w-4" />
+              <Button variant="outline" className="gap-2 h-11" onClick={() => navigate('/news')}>
+                <Icon name="Newspaper" className="h-4 w-4" />
                 Все новости
               </Button>
             </div>
@@ -798,63 +796,62 @@ const Index = () => {
         </section>
       )}
 
-      {/* ════════════════════════════════════════════════
-          REVIEWS — simple grid, works on mobile
-      ════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════
+          REVIEWS
+      ══════════════════════════════════════════════ */}
       <section id="отзывы" className="py-14 md:py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10 md:mb-12">
-            <Badge className="mb-3 md:mb-4 gradient-primary text-white border-0">Отзывы</Badge>
-            <h2 className="text-2xl md:text-5xl font-bold mb-4">Что говорят клиенты</h2>
+            <div className="inline-flex items-center gap-2 bg-yellow-50 text-yellow-700 rounded-full px-4 py-1.5 text-sm font-medium mb-4 border border-yellow-200">
+              <Icon name="Star" className="h-4 w-4" />
+              Отзывы
+            </div>
+            <h2 className="text-2xl md:text-4xl font-extrabold mb-3">Что говорят клиенты</h2>
           </div>
 
           {reviews.length > 0 ? (
-            /* Mobile: 1 col, sm: 2 col, lg: 3 col */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
               {reviews.slice(0, 6).map((r, idx) => (
-                <Card
+                <div
                   key={String(r.id)}
-                  className="hover:shadow-lg transition-all animate-fade-in"
-                  style={{ animationDelay: `${idx * 0.08}s` }}
+                  className="bg-white dark:bg-card border border-border rounded-2xl p-4 md:p-5 hover:shadow-md transition-all animate-fade-in"
+                  style={{ animationDelay: `${idx * 0.07}s` }}
                 >
-                  <CardContent className="p-4 md:p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-full gradient-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                          {String(r.author_name || 'А').charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm leading-tight">{String(r.author_name || 'Аноним')}</p>
-                          {r.source && r.source !== 'site' && (
-                            <p className="text-xs text-muted-foreground">{String(r.source)}</p>
-                          )}
-                        </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                        {String(r.author_name || 'А').charAt(0)}
                       </div>
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Icon
-                            key={i}
-                            name="Star"
-                            className={`h-3.5 w-3.5 ${i < Number(r.rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-                          />
-                        ))}
+                      <div>
+                        <p className="font-semibold text-sm leading-tight">{String(r.author_name || 'Аноним')}</p>
+                        {r.source && r.source !== 'site' && (
+                          <p className="text-xs text-muted-foreground">{String(r.source)}</p>
+                        )}
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{String(r.text)}</p>
-                  </CardContent>
-                </Card>
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Icon
+                          key={i}
+                          name="Star"
+                          className={`h-3.5 w-3.5 ${i < Number(r.rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">{String(r.text)}</p>
+                </div>
               ))}
             </div>
           ) : (
             <p className="text-center text-muted-foreground">Будьте первым, кто оставит отзыв!</p>
           )}
 
-          {/* Leave review CTA */}
           <div className="text-center mt-8">
             <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
               <DialogTrigger asChild>
-                <Button size="lg" className="gradient-primary text-white min-h-[52px]">
-                  <Icon name="Star" className="mr-2 h-5 w-5" />
+                <Button size="lg" className="gradient-primary text-white h-13 px-8 font-semibold gap-2 shadow-lg">
+                  <Icon name="Star" className="h-5 w-5" />
                   Оставить отзыв
                 </Button>
               </DialogTrigger>
@@ -879,24 +876,24 @@ const Index = () => {
                         <button
                           key={n}
                           onClick={() => setReviewForm(f => ({ ...f, rating: n }))}
-                          className={`text-3xl transition-transform hover:scale-110 active:scale-95 ${n <= reviewForm.rating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`}
+                          className={`text-3xl transition-transform hover:scale-110 ${reviewForm.rating >= n ? '' : 'grayscale opacity-40'}`}
                         >
-                          ★
+                          ⭐
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <Label className="text-sm mb-1.5 block">Ваш отзыв</Label>
+                    <Label className="text-sm mb-1.5 block">Текст отзыва</Label>
                     <Textarea
-                      placeholder="Расскажите о вашем опыте..."
-                      rows={4}
+                      placeholder="Расскажите о вашей поездке..."
                       value={reviewForm.text}
                       onChange={e => setReviewForm(f => ({ ...f, text: e.target.value }))}
+                      rows={4}
                     />
                   </div>
                   <Button
-                    className="w-full gradient-primary text-white min-h-[48px]"
+                    className="w-full gradient-primary text-white h-12 font-semibold"
                     onClick={submitReview}
                     disabled={reviewSending || !reviewForm.text.trim()}
                   >
@@ -911,99 +908,102 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════
           CONTACTS
-      ════════════════════════════════════════════════ */}
-      <section id="контакты" className="py-14 md:py-20">
+      ══════════════════════════════════════════════ */}
+      <section id="контакты" className="py-14 md:py-20 bg-gradient-to-b from-muted/30 to-background">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center">
-            <Badge className="mb-3 md:mb-4 gradient-primary text-white border-0">Контакты</Badge>
-            <h2 className="text-2xl md:text-5xl font-bold mb-4 md:mb-6">Свяжитесь с нами</h2>
-            <p className="text-sm md:text-lg text-muted-foreground mb-8 md:mb-10">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5 border border-primary/20">
+              <Icon name="Phone" className="h-4 w-4" />
+              Контакты
+            </div>
+            <h2 className="text-2xl md:text-4xl font-extrabold mb-3">Свяжитесь с нами</h2>
+            <p className="text-sm md:text-base text-muted-foreground mb-8">
               Ответим на все вопросы и поможем с бронированием
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6 mb-8 md:mb-10">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
               {[
-                { icon: 'Phone',  title: 'Телефон', value: phone,   link: `tel:${phone.replace(/\D/g, '')}` },
-                { icon: 'Mail',   title: 'Email',   value: email,   link: `mailto:${email}` },
-                { icon: 'MapPin', title: 'Адрес',   value: address, link: '#' },
+                { icon: 'Phone', title: 'Телефон', value: phone, link: `tel:${phone.replace(/\D/g, '')}` },
+                { icon: 'Mail', title: 'Email', value: email, link: `mailto:${email}` },
+                { icon: 'MapPin', title: 'Адрес', value: address, link: '#' },
               ].map((contact, idx) => (
                 <a
                   key={idx}
                   href={contact.link}
-                  className="block p-4 md:p-6 rounded-xl glass-effect border border-white/40 hover:shadow-xl transition-all hover:-translate-y-0.5 min-h-[80px]"
+                  className="flex flex-col items-center p-5 bg-white dark:bg-card border border-border rounded-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all"
                 >
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full gradient-secondary flex items-center justify-center mx-auto mb-2 md:mb-3">
-                    <Icon name={contact.icon as Parameters<typeof Icon>[0]['name']} className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                  <div className="w-12 h-12 rounded-xl gradient-secondary flex items-center justify-center mb-3 shadow-md">
+                    <Icon name={contact.icon as Parameters<typeof Icon>[0]['name']} className="h-5 w-5 text-white" />
                   </div>
-                  <h3 className="font-semibold mb-1 text-xs md:text-base">{contact.title}</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground break-all">{contact.value}</p>
+                  <h3 className="font-bold mb-1 text-sm">{contact.title}</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground break-all text-center">{contact.value}</p>
                 </a>
               ))}
             </div>
 
-            <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+            <div className="flex flex-wrap justify-center gap-2">
               {settings['whatsapp_number'] && (
                 <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-green-500 hover:bg-green-600 text-white min-h-[48px]">
-                    <Icon name="MessageCircle" className="mr-2 h-5 w-5" />WhatsApp
+                  <Button size="lg" className="bg-green-500 hover:bg-green-600 text-white h-12 gap-2">
+                    <Icon name="MessageCircle" className="h-5 w-5" />WhatsApp
                   </Button>
                 </a>
               )}
               {settings['telegram_username'] && (
                 <a href={telegramUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-blue-500 hover:bg-blue-600 text-white min-h-[48px]">
-                    <Icon name="Send" className="mr-2 h-5 w-5" />Telegram
+                  <Button size="lg" className="bg-blue-500 hover:bg-blue-600 text-white h-12 gap-2">
+                    <Icon name="Send" className="h-5 w-5" />Telegram
                   </Button>
                 </a>
               )}
               {settings['viber_number'] && (
                 <a href={viberUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-purple-500 hover:bg-purple-600 text-white min-h-[48px]">
-                    <Icon name="Phone" className="mr-2 h-5 w-5" />Viber
+                  <Button size="lg" className="bg-purple-500 hover:bg-purple-600 text-white h-12 gap-2">
+                    <Icon name="Phone" className="h-5 w-5" />Viber
                   </Button>
                 </a>
               )}
               {settings['max_username'] && maxUrl !== '#' && (
                 <a href={maxUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white min-h-[48px]">
-                    <Icon name="Zap" className="mr-2 h-5 w-5" />MAX
+                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white h-12 gap-2">
+                    <Icon name="Zap" className="h-5 w-5" />MAX
                   </Button>
                 </a>
               )}
               {settings['vk_url'] && vkUrl !== '#' && (
                 <a href={vkUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-blue-700 hover:bg-blue-800 text-white min-h-[48px]">
-                    <Icon name="Share2" className="mr-2 h-5 w-5" />ВКонтакте
+                  <Button size="lg" className="bg-blue-700 hover:bg-blue-800 text-white h-12 gap-2">
+                    <Icon name="Share2" className="h-5 w-5" />ВКонтакте
                   </Button>
                 </a>
               )}
               {settings['instagram_url'] && instagramUrl !== '#' && (
                 <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-pink-500 hover:bg-pink-600 text-white min-h-[48px]">
-                    <Icon name="Camera" className="mr-2 h-5 w-5" />Instagram
+                  <Button size="lg" className="bg-pink-500 hover:bg-pink-600 text-white h-12 gap-2">
+                    <Icon name="Camera" className="h-5 w-5" />Instagram
                   </Button>
                 </a>
               )}
               {settings['youtube_url'] && youtubeUrl !== '#' && (
                 <a href={youtubeUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-red-500 hover:bg-red-600 text-white min-h-[48px]">
-                    <Icon name="PlayCircle" className="mr-2 h-5 w-5" />YouTube
+                  <Button size="lg" className="bg-red-500 hover:bg-red-600 text-white h-12 gap-2">
+                    <Icon name="PlayCircle" className="h-5 w-5" />YouTube
                   </Button>
                 </a>
               )}
               {settings['tiktok_url'] && tiktokUrl !== '#' && (
                 <a href={tiktokUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-gray-900 hover:bg-black text-white min-h-[48px]">
-                    <Icon name="Music" className="mr-2 h-5 w-5" />TikTok
+                  <Button size="lg" className="bg-gray-900 hover:bg-black text-white h-12 gap-2">
+                    <Icon name="Music" className="h-5 w-5" />TikTok
                   </Button>
                 </a>
               )}
               {!settings['whatsapp_number'] && !settings['telegram_username'] && (
                 <a href={`tel:${phone.replace(/\D/g, '')}`}>
-                  <Button size="lg" className="gradient-primary text-white min-h-[48px]">
-                    <Icon name="Phone" className="mr-2 h-5 w-5" />{phone}
+                  <Button size="lg" className="gradient-primary text-white h-12 gap-2">
+                    <Icon name="Phone" className="h-5 w-5" />{phone}
                   </Button>
                 </a>
               )}
@@ -1012,28 +1012,27 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ════════════════════════════════════════════════
-          FOOTER — stacked columns on mobile
-      ════════════════════════════════════════════════ */}
-      <footer className="py-8 md:py-12 bg-muted/30 border-t">
+      {/* ══════════════════════════════════════════════
+          FOOTER
+      ══════════════════════════════════════════════ */}
+      <footer className="py-8 md:py-12 bg-muted/50 border-t border-border">
         <div className="container mx-auto px-4">
-          {/* Top row: logo + links + copyright stacked on mobile */}
-          <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 md:gap-4">
+          <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
 
             {/* Brand */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-md">
                 <Icon name="Car" className="h-4 w-4 text-white" />
               </div>
               <div className="flex flex-col leading-tight">
-                <span className="text-base md:text-lg font-bold text-gradient">{footerBrand}</span>
+                <span className="font-bold text-gradient">{footerBrand}</span>
                 <span className="text-xs text-muted-foreground">{footerSlogan}</span>
               </div>
             </div>
 
-            {/* Nav links — grid on mobile, flex on md */}
+            {/* Nav links */}
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-              <button className="hover:text-primary transition-colors text-left" onClick={() => scrollToSection('тарифы')}>Тарифы</button>
+              <button className="hover:text-primary transition-colors text-left" onClick={() => scrollTo('тарифы')}>Тарифы</button>
               <button className="hover:text-primary transition-colors text-left" onClick={() => navigate('/tariffs')}>Все маршруты</button>
               <button className="hover:text-primary transition-colors text-left" onClick={() => navigate('/rideshares')}>Попутчики</button>
               <button className="hover:text-primary transition-colors text-left" onClick={() => navigate('/news')}>Новости</button>
@@ -1060,9 +1059,7 @@ const Index = () => {
         </div>
       </footer>
 
-      {/* ════════════════════════════════════════════════
-          AI ASSISTANT
-      ════════════════════════════════════════════════ */}
+      {/* AI Assistant */}
       <AiAssistant />
     </div>
   );

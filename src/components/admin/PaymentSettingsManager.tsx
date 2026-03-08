@@ -40,6 +40,7 @@ const PaymentSettingsManager = () => {
 
   const [integrations, setIntegrations] = useState({
     yookassa_shop_id: '',
+    yookassa_secret_key: '',
     robokassa_login: '',
     robokassa_test_mode: 'true',
     smtp_host: '',
@@ -68,6 +69,7 @@ const PaymentSettingsManager = () => {
       setSiteSettings(s);
       setIntegrations({
         yookassa_shop_id: s['yookassa_shop_id'] || '',
+        yookassa_secret_key: s['yookassa_secret_key'] || '',
         robokassa_login: s['robokassa_login'] || '',
         robokassa_test_mode: s['robokassa_test_mode'] || 'true',
         smtp_host: s['smtp_host'] || '',
@@ -251,20 +253,21 @@ const PaymentSettingsManager = () => {
               <p className="text-xs text-muted-foreground mt-1">Найти в ЮКасса: Настройки → Общие</p>
             </div>
 
-            <div className="p-4 border-2 border-dashed border-amber-300 rounded-xl bg-amber-50">
-              <div className="flex items-start gap-3">
-                <Icon name="Key" className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">Секретный ключ ЮКасса</p>
-                  <p className="text-xs text-amber-700 mt-1">
-                    Секретный ключ нельзя хранить в настройках. Добавьте его в раздел <strong>"Секреты проекта"</strong>:
-                  </p>
-                  <div className="mt-2 font-mono text-xs bg-amber-100 border border-amber-300 rounded p-2 text-amber-900">
-                    Имя секрета: <strong>YOOKASSA_SECRET_KEY</strong><br />
-                    Значение: ваш секретный ключ из ЮКасса
-                  </div>
-                </div>
-              </div>
+            <div>
+              <Label className="flex items-center gap-1.5">
+                <Icon name="Key" className="h-4 w-4 text-amber-500" />
+                Секретный ключ ЮКасса
+              </Label>
+              <Input
+                className="mt-1 font-mono text-sm"
+                type="password"
+                placeholder="live_XXXXXXXXXXXXXXXXXXXXXXXX"
+                value={integrations.yookassa_secret_key || ''}
+                onChange={e => setInt('yookassa_secret_key', e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Найти в ЮКасса: Настройки → Ключи API → Секретный ключ. Начинается с <code>live_</code> или <code>test_</code>.
+              </p>
             </div>
 
             <div className="p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50">
@@ -286,10 +289,12 @@ const PaymentSettingsManager = () => {
 
             <div className="p-3 bg-muted/50 rounded-lg text-sm">
               <p className="font-medium mb-1">Статус ЮКасса:</p>
-              <div className="flex items-center gap-2">
-                {integrations.yookassa_shop_id ? (
-                  <><Badge className="bg-green-500 text-white">Shop ID настроен</Badge>
-                  <span className="text-xs text-muted-foreground">Осталось добавить секрет YOOKASSA_SECRET_KEY</span></>
+              <div className="flex flex-wrap items-center gap-2">
+                {integrations.yookassa_shop_id && integrations.yookassa_secret_key ? (
+                  <Badge className="bg-green-500 text-white">✓ Готова к работе</Badge>
+                ) : integrations.yookassa_shop_id ? (
+                  <><Badge className="bg-amber-500 text-white">Shop ID настроен</Badge>
+                  <span className="text-xs text-muted-foreground">Добавьте секретный ключ</span></>
                 ) : (
                   <Badge variant="outline">Не настроена</Badge>
                 )}

@@ -376,6 +376,8 @@ const PassengerCabinet = () => {
     car_class: 'comfort',
     notes: '',
     payment_type: 'online',
+    passenger_name_override: undefined as string | undefined,
+    passenger_phone_override: undefined as string | undefined,
   });
   const [paymentSettings, setPaymentSettings] = useState<{
     payment_provider?: string;
@@ -697,16 +699,29 @@ const PassengerCabinet = () => {
 
     setOrderLoading(true);
     try {
+      const finalName = orderForm.passenger_name_override?.trim() || userName;
+      const finalPhone = orderForm.passenger_phone_override?.trim() || userPhone;
+      if (!finalName) {
+        toast({ title: 'Укажите ваше имя (Ф.И.О.)', variant: 'destructive' }); setOrderLoading(false); return;
+      }
+      if (!finalPhone) {
+        toast({ title: 'Укажите номер телефона', variant: 'destructive' }); setOrderLoading(false); return;
+      }
       const res = await fetch(API_URLS.orders, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-User-Id': userId },
         body: JSON.stringify({
-          ...orderForm,
+          from_location: orderForm.from_location,
+          to_location: orderForm.to_location,
+          pickup_datetime: orderForm.pickup_datetime,
+          flight_number: orderForm.flight_number,
           passengers_count: parseInt(orderForm.passengers_count),
           tariff_id: orderForm.tariff_id ? parseInt(orderForm.tariff_id) : null,
+          car_class: orderForm.car_class,
+          notes: orderForm.notes,
           price: computedPrice,
-          passenger_name: userName,
-          passenger_phone: userPhone,
+          passenger_name: finalName,
+          passenger_phone: finalPhone,
           user_id: parseInt(userId),
           payment_type: isCash ? 'cash' : isPrepay ? 'prepay' : 'full',
           transfer_type: 'individual',
@@ -722,6 +737,7 @@ const PassengerCabinet = () => {
         toast({ title: `Заказ #${data.id} создан!`, description: isCash ? 'Оплата — наличными при встрече' : 'Водитель свяжется с вами' });
         setOrderDialog(false);
         setShowOrderForm(false);
+        setOrderForm(f => ({ ...f, passenger_name_override: undefined, passenger_phone_override: undefined }));
         if (userId) loadTransferOrders(userId);
       }
     } catch (err: unknown) {
@@ -1042,6 +1058,34 @@ const PassengerCabinet = () => {
                       </div>
                     </div>
 
+                    {/* FIO & Phone */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ваше имя (Ф.И.О.)</label>
+                      <div className="relative">
+                        <Icon name="User" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          className="h-12 pl-9 bg-background"
+                          placeholder="Иванов Иван Иванович"
+                          value={orderForm.passenger_name_override ?? userName}
+                          onChange={e => setOrderForm(f => ({ ...f, passenger_name_override: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Номер телефона</label>
+                      <div className="relative">
+                        <Icon name="Phone" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          className="h-12 pl-9 bg-background"
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="+7 (900) 000-00-00"
+                          value={orderForm.passenger_phone_override ?? userPhone}
+                          onChange={e => setOrderForm(f => ({ ...f, passenger_phone_override: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
                     {/* Notes */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -1192,7 +1236,7 @@ const PassengerCabinet = () => {
                 {/* Create order button */}
                 <button
                   onClick={() => {
-                    setOrderForm({ from_location: '', to_location: '', pickup_datetime: '', flight_number: '', passengers_count: '1', tariff_id: '', car_class: 'comfort', notes: '', payment_type: paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none' ? 'online' : 'cash' });
+                    setOrderForm({ from_location: '', to_location: '', pickup_datetime: '', flight_number: '', passengers_count: '1', tariff_id: '', car_class: 'comfort', notes: '', payment_type: paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none' ? 'online' : 'cash', passenger_name_override: undefined, passenger_phone_override: undefined });
                     setShowOrderForm(true);
                   }}
                   className="w-full gradient-primary text-white min-h-[64px] rounded-2xl font-semibold text-base flex items-center justify-center gap-3 hover:opacity-95 transition-opacity shadow-lg"

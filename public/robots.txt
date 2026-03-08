@@ -19,12 +19,20 @@ Allow: /
 Disallow: /admin
 Disallow: /driver/cabinet
 Disallow: /profile
+Disallow: /passenger
 
 User-agent: Yandexbot
 Allow: /
 Disallow: /admin
 Disallow: /driver/cabinet
 Disallow: /profile
+Disallow: /passenger
+
+User-agent: YandexMetrika
+Disallow: /
+
+User-agent: YandexImages
+Allow: /
 
 User-agent: Bingbot
 Allow: /
