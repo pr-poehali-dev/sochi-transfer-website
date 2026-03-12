@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import Icon from '@/components/ui/icon';
 import BookingForm from '@/components/BookingForm';
 import AiAssistant from '@/components/AiAssistant';
@@ -16,7 +17,6 @@ const Index = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const [tariffs, setTariffs] = useState<Record<string, unknown>[]>([]);
   const [fleet, setFleet] = useState<Record<string, unknown>[]>([]);
@@ -44,11 +44,6 @@ const Index = () => {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-
-  useEffect(() => {
-    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [mobileMenuOpen]);
 
   useEffect(() => {
     const id = settings['yandex_metrika_id'];
@@ -265,35 +260,17 @@ const Index = () => {
                   <Icon name="MessageCircle" className="h-5 w-5" />
                 </a>
               )}
-              <button
-                className="h-11 w-11 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
-                onClick={() => setMobileMenuOpen(v => !v)}
-                aria-label={mobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
-                aria-expanded={mobileMenuOpen}
-              >
-                <Icon name={mobileMenuOpen ? 'X' : 'Menu'} className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile drawer */}
-        {mobileMenuOpen && (
-          <>
-            <div
-              className="lg:hidden fixed inset-0 bg-black/40 z-40"
-              style={{ top: '64px' }}
-              onClick={() => setMobileMenuOpen(false)}
-            />
-            <div
-              ref={menuRef}
-              className="lg:hidden fixed left-0 right-0 bottom-0 z-50 bg-background rounded-t-2xl shadow-2xl overflow-y-auto"
-              style={{ top: '64px', WebkitOverflowScrolling: 'touch', maxHeight: 'calc(100dvh - 64px)' }}
-            >
-              <div className="px-4 pt-2 pb-6 max-w-lg mx-auto">
-                {/* Handle */}
-                <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4 mt-2" />
-
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <button
+                    className="h-11 w-11 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
+                    aria-label="Открыть меню"
+                  >
+                    <Icon name="Menu" className="h-6 w-6" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[300px] sm:w-[360px] p-0 overflow-y-auto">
+              <div className="px-4 pt-5 pb-8">
                 {/* Navigation sections */}
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 mb-2">Навигация</p>
                 <div className="space-y-0.5 mb-3">
@@ -433,9 +410,11 @@ const Index = () => {
                   )}
                 </div>
               </div>
+                </SheetContent>
+              </Sheet>
             </div>
-          </>
-        )}
+          </div>
+        </div>
       </nav>
 
       {/* ══════════════════════════════════════════════

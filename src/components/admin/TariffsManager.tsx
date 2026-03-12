@@ -19,6 +19,9 @@ interface Tariff {
   image_emoji: string;
   image_url: string | null;
   is_active: boolean;
+  meta_title?: string;
+  meta_description?: string;
+  meta_keywords?: string;
 }
 
 interface TariffsManagerProps {
@@ -36,7 +39,10 @@ const TariffsManager = ({ onUpdate }: TariffsManagerProps) => {
     duration: '',
     image_emoji: '🚗',
     is_active: true,
-    image_base64: ''
+    image_base64: '',
+    meta_title: '',
+    meta_description: '',
+    meta_keywords: '',
   });
   const { toast } = useToast();
 
@@ -105,14 +111,18 @@ const TariffsManager = ({ onUpdate }: TariffsManagerProps) => {
       distance: tariff.distance || '',
       duration: tariff.duration || '',
       image_emoji: tariff.image_emoji,
-      is_active: tariff.is_active
+      is_active: tariff.is_active,
+      image_base64: '',
+      meta_title: tariff.meta_title || '',
+      meta_description: tariff.meta_description || '',
+      meta_keywords: tariff.meta_keywords || '',
     });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
     setEditingTariff(null);
-    setFormData({ city: '', price: '', distance: '', duration: '', image_emoji: '🚗', is_active: true, image_base64: '' });
+    setFormData({ city: '', price: '', distance: '', duration: '', image_emoji: '🚗', is_active: true, image_base64: '', meta_title: '', meta_description: '', meta_keywords: '' });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,6 +182,28 @@ const TariffsManager = ({ onUpdate }: TariffsManagerProps) => {
                 <Label>Активен</Label>
                 <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
               </div>
+
+              <div className="border-t pt-3">
+                <p className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                  <Icon name="Globe" className="h-4 w-4" />
+                  SEO для этого тарифа
+                </p>
+                <div className="space-y-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Meta Title (заголовок страницы)</Label>
+                    <Input placeholder={`Трансфер Аэропорт Сочи — ${formData.city || 'Город'} | от ${formData.price || '0'} ₽`} value={formData.meta_title} onChange={e => setFormData({ ...formData, meta_title: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Meta Description</Label>
+                    <Input placeholder={`Трансфер из аэропорта Сочи до ${formData.city || 'города'}. Фиксированная цена от ${formData.price || '0'} ₽`} value={formData.meta_description} onChange={e => setFormData({ ...formData, meta_description: e.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Ключевые слова (через запятую)</Label>
+                    <Input placeholder={`трансфер ${formData.city || 'город'}, такси аэропорт`} value={formData.meta_keywords} onChange={e => setFormData({ ...formData, meta_keywords: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
               <Button type="submit" className="w-full gradient-primary text-white">Сохранить</Button>
             </form>
           </DialogContent>

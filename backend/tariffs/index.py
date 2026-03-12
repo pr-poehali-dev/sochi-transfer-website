@@ -49,10 +49,11 @@ def handle_tariffs(method, event, params):
         if data.get('image_base64'):
             image_url = upload_s3(data['image_base64'], f"tariff_{os.urandom(6).hex()}.jpg", 'tariffs')
         cur.execute(f'''
-            INSERT INTO {SCHEMA}.tariffs (city, price, distance, duration, image_emoji, image_url, is_active)
-            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+            INSERT INTO {SCHEMA}.tariffs (city, price, distance, duration, image_emoji, image_url, is_active, meta_title, meta_description, meta_keywords)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
         ''', (data.get('city'), data.get('price'), data.get('distance'), data.get('duration'),
-              data.get('image_emoji','🚗'), image_url, data.get('is_active', True)))
+              data.get('image_emoji','🚗'), image_url, data.get('is_active', True),
+              data.get('meta_title'), data.get('meta_description'), data.get('meta_keywords')))
         tid = cur.fetchone()[0]
         conn.commit(); cur.close(); conn.close()
         return resp(201, {'id': tid, 'message': 'Тариф создан'})
@@ -63,10 +64,13 @@ def handle_tariffs(method, event, params):
             image_url = upload_s3(data['image_base64'], f"tariff_{os.urandom(6).hex()}.jpg", 'tariffs')
         cur.execute(f'''
             UPDATE {SCHEMA}.tariffs SET city=%s, price=%s, distance=%s, duration=%s,
-            image_emoji=%s, is_active=%s, image_url=COALESCE(%s, image_url), updated_at=NOW()
+            image_emoji=%s, is_active=%s, image_url=COALESCE(%s, image_url),
+            meta_title=%s, meta_description=%s, meta_keywords=%s, updated_at=NOW()
             WHERE id=%s
         ''', (data.get('city'), data.get('price'), data.get('distance'), data.get('duration'),
-              data.get('image_emoji'), data.get('is_active'), image_url, data.get('id')))
+              data.get('image_emoji'), data.get('is_active'), image_url,
+              data.get('meta_title'), data.get('meta_description'), data.get('meta_keywords'),
+              data.get('id')))
         conn.commit(); cur.close(); conn.close()
         return resp(200, {'message': 'Тариф обновлён'})
     elif method == 'DELETE':

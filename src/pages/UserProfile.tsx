@@ -303,6 +303,7 @@ const UserProfile = () => {
     tariff_id: '',
     from_location: '',
     to_location: '',
+    pickup_address: '',
     pickup_datetime: '',
     passengers_count: '1',
     car_class: 'comfort',
@@ -440,13 +441,18 @@ const UserProfile = () => {
       const r = await fetch(API_URLS.balance, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'deposit', amount: parseFloat(depositAmount), payment_method: depositMethod, user_id: userId }),
+        body: JSON.stringify({ action: 'deposit', amount: parseFloat(depositAmount), payment_method: depositMethod || 'yookassa', user_id: userId }),
       });
       const data = await r.json();
       if (data.error) { toast({ title: data.error, variant: 'destructive' }); return; }
-      toast({ title: 'Заявка на пополнение создана' });
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
+        return;
+      }
+      toast({ title: 'Баланс пополнен' });
       setDepositOpen(false);
       setDepositAmount('');
+      loadBalance();
     } catch { toast({ title: 'Ошибка', variant: 'destructive' }); }
   };
 
@@ -476,6 +482,11 @@ const UserProfile = () => {
       const isCash = orderForm.payment_type === 'cash';
       const hasProvider = paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none';
 
+      const isBalance = orderForm.payment_type === 'balance';
+      const notesWithPickup = orderForm.pickup_address
+        ? `Адрес подачи: ${orderForm.pickup_address}${orderForm.notes ? '\n' + orderForm.notes : ''}`
+        : orderForm.notes;
+
       const res = await fetch(API_URLS.orders, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-User-Id': userId || '' },
@@ -486,15 +497,15 @@ const UserProfile = () => {
           passengers_count: parseInt(orderForm.passengers_count),
           car_class: orderForm.car_class,
           flight_number: orderForm.flight_number,
-          notes: orderForm.notes,
+          notes: notesWithPickup,
           tariff_id: orderForm.tariff_id ? parseInt(orderForm.tariff_id) : null,
           price: computedPrice || undefined,
           passenger_name: name,
           passenger_phone: phone,
           user_id: parseInt(userId || '0'),
-          payment_type: isCash ? 'cash' : orderForm.payment_type === 'prepay' ? 'prepay' : 'full',
+          payment_type: isCash ? 'cash' : isBalance ? 'balance' : orderForm.payment_type === 'prepay' ? 'prepay' : 'full',
           transfer_type: 'individual',
-          force_payment: !isCash && !!hasProvider,
+          force_payment: !isCash && !isBalance && !!hasProvider,
         }),
       });
       const data = await res.json();
@@ -697,6 +708,16 @@ const UserProfile = () => {
                     )}
                   </div>
 
+                  {/* Pickup address */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Точный адрес подачи</Label>
+                    <div className="relative">
+                      <Icon name="MapPin" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500 pointer-events-none" />
+                      <Input className="h-12 pl-9" placeholder="Терминал А, выход №3, отель, адрес..." value={orderForm.pickup_address} onChange={e => setOrderForm(f => ({ ...f, pickup_address: e.target.value }))} />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground px-1">Укажите точное место, где вас забрать (терминал, отель, улица)</p>
+                  </div>
+
                   {/* Car class */}
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Класс автомобиля</Label>
@@ -801,6 +822,24 @@ const UserProfile = () => {
                     {/* Payment method */}
                     <p className="text-sm font-semibold">Способ оплаты</p>
 
+                    {/* Balance */}
+                    {balance >= computedPrice && computedPrice > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setOrderForm(f => ({ ...f, payment_type: 'balance' }))}
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${orderForm.payment_type === 'balance' ? 'border-green-500 bg-green-50' : 'border-border hover:border-green-400'}`}
+                      >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${orderForm.payment_type === 'balance' ? 'bg-green-500' : 'bg-muted'}`}>
+                          <Icon name="Wallet" className={`h-5 w-5 ${orderForm.payment_type === 'balance' ? 'text-white' : 'text-muted-foreground'}`} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold">Оплата с баланса</p>
+                          <p className="text-xs text-muted-foreground">Остаток: {(balance - computedPrice).toLocaleString('ru-RU')} ₽ после оплаты</p>
+                        </div>
+                        <span className="font-bold text-sm text-green-600">{computedPrice.toLocaleString('ru-RU')} ₽</span>
+                      </button>
+                    )}
+
                     {/* Cash */}
                     <button
                       type="button"
@@ -861,6 +900,8 @@ const UserProfile = () => {
                       <span>
                         {orderForm.payment_type === 'cash'
                           ? 'Заказ будет создан, водитель свяжется с вами для подтверждения.'
+                          : orderForm.payment_type === 'balance'
+                          ? 'Сумма будет списана с вашего баланса. Водитель свяжется с вами.'
                           : 'После оплаты вам будет назначен водитель. Контакты появятся в разделе «Мои заказы».'}
                       </span>
                     </div>
@@ -925,18 +966,29 @@ const UserProfile = () => {
                         <div className="space-y-4 pt-1">
                           <div>
                             <Label className="text-sm mb-1.5 block">Сумма (₽)</Label>
-                            <Input type="number" placeholder="1000" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} className="h-11" />
+                            <Input type="number" inputMode="numeric" placeholder="1000" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} className="h-12 text-lg font-bold" />
                           </div>
-                          <div>
-                            <Label className="text-sm mb-1.5 block">Способ оплаты</Label>
-                            <select className="w-full h-11 px-3 rounded-lg border border-border bg-background text-sm" value={depositMethod} onChange={e => setDepositMethod(e.target.value)}>
-                              <option value="">Выберите...</option>
-                              <option value="card">Банковская карта</option>
-                              <option value="sbp">СБП</option>
-                              <option value="cash">Наличные</option>
-                            </select>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[500, 1000, 2000, 3000, 5000, 10000].map(amt => (
+                              <button key={amt} type="button" onClick={() => setDepositAmount(String(amt))}
+                                className={`py-2 rounded-xl border-2 text-sm font-semibold transition-all ${depositAmount === String(amt) ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/40'}`}>
+                                {amt.toLocaleString('ru-RU')} ₽
+                              </button>
+                            ))}
                           </div>
-                          <Button className="w-full gradient-primary text-white min-h-[48px]" onClick={submitDeposit}>Пополнить</Button>
+                          {paymentSettings.payment_provider && paymentSettings.payment_provider !== 'none' ? (
+                            <>
+                              <div className="flex items-center gap-2 bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
+                                <Icon name="CreditCard" className="h-4 w-4 shrink-0" />
+                                <span>Оплата через {paymentSettings.payment_provider === 'yookassa' ? 'ЮКасса' : 'Робокасса'} — картой или СБП</span>
+                              </div>
+                              <Button className="w-full gradient-primary text-white min-h-[48px] font-semibold" onClick={submitDeposit} disabled={!depositAmount}>
+                                <Icon name="CreditCard" className="mr-2 h-4 w-4" />Перейти к оплате {depositAmount ? `${Number(depositAmount).toLocaleString('ru-RU')} ₽` : ''}
+                              </Button>
+                            </>
+                          ) : (
+                            <Button className="w-full gradient-primary text-white min-h-[48px]" onClick={submitDeposit}>Пополнить</Button>
+                          )}
                         </div>
                       </DialogContent>
                     </Dialog>
